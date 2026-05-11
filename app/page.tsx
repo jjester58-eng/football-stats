@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowLeft, Plus, Save, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Save, Users, Settings } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -30,7 +30,7 @@ type PlayEntry = {
   coverage: string;
 };
 
-export default function UnifiedLiveEntry() {
+export default function Home() {
   const [viewMode, setViewMode] = useState<'offense' | 'defense' | 'both'>('both');
   const [data, setData] = useState<PlayEntry[]>([
     {
@@ -74,8 +74,11 @@ export default function UnifiedLiveEntry() {
   if (viewMode === 'defense') columns = [...columns, ...defenseColumns];
   if (viewMode === 'both') columns = [...columns, ...offenseColumns, ...defenseColumns];
 
-  // Editable Cell (same as before)
-  function EditableCell({ value, rowIndex, columnId }: { value: any; rowIndex: number; columnId: string }) {
+  function EditableCell({ value, rowIndex, columnId }: { 
+    value: any; 
+    rowIndex: number; 
+    columnId: string;
+  }) {
     const [editing, setEditing] = useState(false);
     const [val, setVal] = useState(value?.toString() || '');
 
@@ -124,35 +127,57 @@ export default function UnifiedLiveEntry() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
-              <ArrowLeft size={20} /> Back
+    <div className="min-h-screen bg-zinc-950 text-white">
+      {/* Top Bar */}
+      <nav className="border-b border-zinc-800 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
+              K
+            </div>
+            <div className="font-bold text-2xl">Kangaroos Stats</div>
+          </div>
+
+          <div className="flex items-center gap-6 text-sm">
+            <a href="#" className="text-blue-400">Live Entry</a>
+            <a href="#" className="hover:text-zinc-300">Games</a>
+            <a href="#" className="hover:text-zinc-300">Analysis</a>
+            <a href="#" className="hover:text-zinc-300">Opponents</a>
+            <button className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-xl">
+              <Settings size={18} /> Config
             </button>
-            <h1 className="text-4xl font-bold">Live Play Entry</h1>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-5xl font-bold tracking-tight">Live Play Entry</h1>
+            <p className="text-emerald-500 flex items-center gap-2 mt-2">
+              <Users size={20} /> Real-time • Multiple users can enter data
+            </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex bg-zinc-900 rounded-2xl p-1">
+            <div className="flex bg-zinc-900 rounded-2xl p-1 border border-zinc-700">
               <button
                 onClick={() => setViewMode('both')}
-                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'both' ? 'bg-blue-600' : 'hover:bg-zinc-800'}`}
+                className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${viewMode === 'both' ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'}`}
               >
                 Both
               </button>
               <button
                 onClick={() => setViewMode('offense')}
-                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'offense' ? 'bg-blue-600' : 'hover:bg-zinc-800'}`}
+                className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${viewMode === 'offense' ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'}`}
               >
-                Offense
+                Offense Only
               </button>
               <button
                 onClick={() => setViewMode('defense')}
-                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'defense' ? 'bg-blue-600' : 'hover:bg-zinc-800'}`}
+                className={`px-6 py-2.5 rounded-xl text-sm font-medium transition-all ${viewMode === 'defense' ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'}`}
               >
-                Defense
+                Defense Only
               </button>
             </div>
 
@@ -163,20 +188,20 @@ export default function UnifiedLiveEntry() {
               <Plus size={20} /> New Play
             </button>
 
-            <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-2xl font-semibold">
+            <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-2xl font-semibold">
               <Save size={20} /> Save Game
             </button>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900">
+        {/* The Table */}
+        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-2xl">
           <table className="w-full border-collapse min-w-[1600px]">
             <thead>
               {table.getHeaderGroups().map(headerGroup => (
-                <tr key={headerGroup.id} className="bg-zinc-950 border-b border-zinc-700">
+                <tr key={headerGroup.id} className="bg-zinc-950 border-b-2 border-zinc-600 sticky top-0 z-10">
                   {headerGroup.headers.map(header => (
-                    <th key={header.id} className="px-4 py-4 text-left text-xs font-medium text-zinc-400">
+                    <th key={header.id} className="px-4 py-5 text-left text-xs font-semibold text-zinc-300">
                       {flexRender(header.column.columnDef.header, header.getContext())}
                     </th>
                   ))}
@@ -187,7 +212,7 @@ export default function UnifiedLiveEntry() {
               {table.getRowModel().rows.map((row, rowIndex) => (
                 <tr key={row.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
                   {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-2 py-1 border-r border-zinc-800">
+                    <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
                       <EditableCell 
                         value={cell.getValue()} 
                         rowIndex={rowIndex} 
