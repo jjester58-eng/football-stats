@@ -1,161 +1,206 @@
 'use client';
 
-import { Play, Upload, BarChart3, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, Plus, Save, ToggleLeft, ToggleRight } from 'lucide-react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  createColumnHelper,
+  flexRender,
+} from '@tanstack/react-table';
 
-export default function KangaroosLanding() {
+type PlayEntry = {
+  id: number;
+  playNumber: number;
+  down: number | '';
+  dist: number | '';
+  hash: string;
+  yardLine: number | '';
+  playType: string;
+  result: string;
+  yards: number | '';
+  offFormation: string;
+  motion: string;
+  offPlay: string;
+  rpo: string;
+  playDirection: string;
+  defFront: string;
+  stunt: string;
+  blitz: string;
+  coverage: string;
+};
+
+export default function UnifiedLiveEntry() {
+  const [viewMode, setViewMode] = useState<'offense' | 'defense' | 'both'>('both');
+  const [data, setData] = useState<PlayEntry[]>([
+    {
+      id: 1, playNumber: 1, down: 1, dist: 10, hash: 'R', yardLine: 25,
+      playType: '', result: '', yards: '',
+      offFormation: '', motion: '', offPlay: '', rpo: '', playDirection: '',
+      defFront: '', stunt: '', blitz: '', coverage: ''
+    }
+  ]);
+
+  const columnHelper = createColumnHelper<PlayEntry>();
+
+  const baseColumns = [
+    columnHelper.accessor('playNumber', { header: 'PLAY #' }),
+    columnHelper.accessor('down', { header: 'DN' }),
+    columnHelper.accessor('dist', { header: 'DIST' }),
+    columnHelper.accessor('hash', { header: 'HASH' }),
+    columnHelper.accessor('yardLine', { header: 'YARD LN' }),
+    columnHelper.accessor('playType', { header: 'PLAY TYPE' }),
+    columnHelper.accessor('result', { header: 'RESULT' }),
+    columnHelper.accessor('yards', { header: 'GN/LS' }),
+  ];
+
+  const offenseColumns = [
+    columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
+    columnHelper.accessor('motion', { header: 'MOTION' }),
+    columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
+    columnHelper.accessor('rpo', { header: 'RPO' }),
+    columnHelper.accessor('playDirection', { header: 'DIR' }),
+  ];
+
+  const defenseColumns = [
+    columnHelper.accessor('defFront', { header: 'DEF FRONT' }),
+    columnHelper.accessor('stunt', { header: 'STUNT' }),
+    columnHelper.accessor('blitz', { header: 'BLITZ' }),
+    columnHelper.accessor('coverage', { header: 'COVERAGE' }),
+  ];
+
+  let columns = [...baseColumns];
+  if (viewMode === 'offense') columns = [...columns, ...offenseColumns];
+  if (viewMode === 'defense') columns = [...columns, ...defenseColumns];
+  if (viewMode === 'both') columns = [...columns, ...offenseColumns, ...defenseColumns];
+
+  // Editable Cell (same as before)
+  function EditableCell({ value, rowIndex, columnId }: { value: any; rowIndex: number; columnId: string }) {
+    const [editing, setEditing] = useState(false);
+    const [val, setVal] = useState(value?.toString() || '');
+
+    const handleSave = () => {
+      setEditing(false);
+      const newData = [...data];
+      let finalValue: any = val;
+      if (['down', 'dist', 'yardLine', 'yards'].includes(columnId)) {
+        finalValue = val === '' ? '' : Number(val);
+      }
+      (newData[rowIndex] as any)[columnId] = finalValue;
+      setData(newData);
+    };
+
+    return editing ? (
+      <input
+        autoFocus
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+        className="w-full bg-zinc-900 border border-blue-500 px-3 py-1 text-center outline-none"
+      />
+    ) : (
+      <div
+        onClick={() => setEditing(true)}
+        className="min-h-[34px] px-3 py-1 cursor-text hover:bg-zinc-800 rounded flex items-center"
+      >
+        {value ?? ''}
+      </div>
+    );
+  }
+
+  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
+
+  const addNewRow = () => {
+    const newPlay: PlayEntry = {
+      id: data.length + 1,
+      playNumber: data.length + 1,
+      down: '', dist: '', hash: '', yardLine: '',
+      playType: '', result: '', yards: '',
+      offFormation: '', motion: '', offPlay: '', rpo: '', playDirection: '',
+      defFront: '', stunt: '', blitz: '', coverage: ''
+    };
+    setData([...data, newPlay]);
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Top Nav */}
-      <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md fixed w-full z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
-              K
-            </div>
-            <div>
-              <div className="font-bold text-2xl tracking-tight">Kangaroos Stats</div>
-              <div className="text-xs text-zinc-500 -mt-1">HS Football</div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-8 text-sm">
-            <a href="#" className="hover:text-blue-400 transition-colors">Dashboard</a>
-            <a href="#" className="hover:text-blue-400 transition-colors">Games</a>
-            <a href="#" className="hover:text-blue-400 transition-colors">Opponents</a>
-            <a href="#" className="hover:text-blue-400 transition-colors">Analysis</a>
-          </div>
-        </div>
-      </nav>
-
-      <div className="pt-24 pb-16">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          {/* Hero */}
-          <div className="mb-16 mt-8">
-            <div className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-1.5 text-sm mb-6">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              Ready for Game Day
-            </div>
-            
-            <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-6">
-              Kangaroos Football<br />
-              <span className="bg-gradient-to-r from-blue-400 to-white bg-clip-text text-transparent">
-                Stats & Scouting
-              </span>
-            </h1>
-            
-            <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-              Live play-by-play entry • Powerful tendency analysis • Opponent scouting
-            </p>
+    <div className="min-h-screen bg-zinc-950 text-white p-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-4">
+            <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
+              <ArrowLeft size={20} /> Back
+            </button>
+            <h1 className="text-4xl font-bold">Live Play Entry</h1>
           </div>
 
-          {/* Main Action Cards */}
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            
-            {/* Live Entry Card */}
-            <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-blue-500 transition-all group">
-              <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Play className="w-8 h-8 text-blue-500" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Live Data Entry</h3>
-              <p className="text-zinc-400 mb-8">
-                Enter plays in real-time like a Google Sheet. Fast tab & enter navigation.
-              </p>
-              
-              <div className="space-y-3">
-                <button 
-                  className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-colors"
-                  onClick={() => window.location.href = '/enter/offense'}
-                >
-                  OFFENSE <ArrowRight className="w-5 h-5" />
-                </button>
-                
-                <button 
-                  className="w-full bg-zinc-800 hover:bg-zinc-700 py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-colors border border-zinc-700"
-                  onClick={() => window.location.href = '/enter/defense'}
-                >
-                  DEFENSE <ArrowRight className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Upload Card */}
-            <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-white transition-all group">
-              <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Upload className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Upload Data</h3>
-              <p className="text-zinc-400 mb-8">
-                Import previous games from CSV files for offense and defense.
-              </p>
-              
-              <button className="w-full bg-white text-black py-4 rounded-2xl font-semibold hover:bg-zinc-200 transition-colors">
-                Upload Offense CSV
+          <div className="flex items-center gap-4">
+            <div className="flex bg-zinc-900 rounded-2xl p-1">
+              <button
+                onClick={() => setViewMode('both')}
+                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'both' ? 'bg-blue-600' : 'hover:bg-zinc-800'}`}
+              >
+                Both
               </button>
-              <button className="w-full mt-3 bg-transparent border border-zinc-700 py-4 rounded-2xl font-semibold hover:bg-zinc-800 transition-colors">
-                Upload Defense CSV
+              <button
+                onClick={() => setViewMode('offense')}
+                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'offense' ? 'bg-blue-600' : 'hover:bg-zinc-800'}`}
+              >
+                Offense
+              </button>
+              <button
+                onClick={() => setViewMode('defense')}
+                className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${viewMode === 'defense' ? 'bg-blue-600' : 'hover:bg-zinc-800'}`}
+              >
+                Defense
               </button>
             </div>
 
-            {/* Analyze Card */}
-            <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-blue-500 transition-all group">
-              <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <BarChart3 className="w-8 h-8 text-blue-500" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Analyze & Scout</h3>
-              <p className="text-zinc-400 mb-8">
-                View tendencies, success rates, and scout opponents.
-              </p>
-              
-              <div className="space-y-4">
-                <div className="relative">
-                  <select className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-5 text-white appearance-none">
-                    <option>Select Opponent</option>
-                    <option>Westside Warriors</option>
-                    <option>Central Tigers</option>
-                    <option>Riverside Rams</option>
-                  </select>
-                </div>
-                
-                <button className="w-full bg-zinc-800 hover:bg-zinc-700 py-4 rounded-2xl font-semibold transition-colors">
-                  View All Logged Games →
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={addNewRow}
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-2xl"
+            >
+              <Plus size={20} /> New Play
+            </button>
+
+            <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-2xl font-semibold">
+              <Save size={20} /> Save Game
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Recent Games / Quick Stats */}
-      <div className="bg-zinc-900 border-t border-zinc-800 py-16">
-        <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-3xl font-bold mb-8">Recent Games</h2>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* Placeholder recent games - we'll make dynamic later */}
-            {[1,2,3].map((i) => (
-              <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 hover:border-zinc-600 transition-colors">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="font-semibold">vs. Central Tigers</div>
-                    <div className="text-sm text-zinc-500">May 8, 2026</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-emerald-400 font-bold">W 28-14</div>
-                  </div>
-                </div>
-                <div className="text-sm text-zinc-400 space-y-1">
-                  <div>Offense: 312 yards • 4 TDs</div>
-                  <div>Defense: 3 sacks • 1 INT</div>
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Table */}
+        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900">
+          <table className="w-full border-collapse min-w-[1600px]">
+            <thead>
+              {table.getHeaderGroups().map(headerGroup => (
+                <tr key={headerGroup.id} className="bg-zinc-950 border-b border-zinc-700">
+                  {headerGroup.headers.map(header => (
+                    <th key={header.id} className="px-4 py-4 text-left text-xs font-medium text-zinc-400">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row, rowIndex) => (
+                <tr key={row.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id} className="px-2 py-1 border-r border-zinc-800">
+                      <EditableCell 
+                        value={cell.getValue()} 
+                        rowIndex={rowIndex} 
+                        columnId={cell.column.id} 
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      <footer className="border-t border-zinc-800 py-8 text-center text-zinc-500 text-sm">
-        Kangaroos Football • Built with ❤️ for the sideline
-      </footer>
     </div>
   );
 }
