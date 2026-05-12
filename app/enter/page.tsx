@@ -313,16 +313,24 @@ const calculateGainLoss = (
 }
 
     // Auto gain/loss from yard line
-    if (
-      columnId === 'yardLine' &&
-      rowIndex > 0
-    ) {
-      newData[rowIndex - 1].gnls =
-        calculateGainLoss(
-          newData[rowIndex - 1].yardLine,
-          newValue
-        );
-    }
+   if (
+  columnId === 'yardLine' &&
+  rowIndex > 0
+) {
+
+  // Calculate previous play gain/loss
+  newData[rowIndex - 1].gnls =
+    calculateGainLoss(
+      newData[rowIndex - 1].yardLine,
+      Number(newValue)
+    );
+
+  // Auto update next down/distance
+  updateNextDownDistance(
+    newData,
+    rowIndex - 1
+  );
+}
 
     // Auto next down/dist
     if (
