@@ -13,11 +13,11 @@ type PlayEntry = {
   id: number;
   playNumber: number;
   odk: string;
-  down: number | '' | 'TO';
-  dist: number | '';
+  down: number | null | '';
+  dist: number | null | '';
   hash: string;
-  gnls: number | '';
-  yardLine: number | '';
+  gnls: number | null | '';
+  yardLine: number | null | '';
   playType: string;
   result: string;
   offFormation: string;
@@ -182,13 +182,15 @@ if (rows.length > 0) {
 };
 
 const calculateGainLoss = (
-  prevYard: number | '',
-  currentYard: number | ''
+  prevYard: number | null | '',
+  currentYard: number | null | ''
 ): number | '' => {
 
   if (
     prevYard === '' ||
-    currentYard === ''
+    prevYard === null ||
+    currentYard === '' ||
+    currentYard === null
   ) {
     return '';
   }
@@ -216,8 +218,11 @@ const calculateGainLoss = (
 
   // Must have complete values first
   if (
+    current.down === null ||
     current.down === '' ||
+    current.dist === null ||
     current.dist === '' ||
+    current.gnls === null ||
     current.gnls === ''
   ) {
     return;
@@ -295,9 +300,6 @@ const calculateGainLoss = (
   // ================================
   // UPDATE CELL
   // ================================
-  // ================================
-// UPDATE CELL
-// ================================
 const updateRow = (
   rowIndex: number,
   columnId: string,
