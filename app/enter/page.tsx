@@ -17,7 +17,7 @@ type PlayEntry = {
   dist: number | '';
   hash: string;
   gnls: number | '';
-  yardLine: string;
+  yardLine: number | '';
   playType: string;
   result: string;
   offFormation: string;
@@ -46,8 +46,8 @@ export default function LiveEntry() {
         id: i,
         playNumber: i,
         odk: i % 3 === 0 ? 'D' : 'O',
-        down: '',
-        dist: '',
+        down: 1,
+        dist: 10,
         hash: '',
         gnls: '',
         yardLine: '',
@@ -156,31 +156,46 @@ export default function LiveEntry() {
   // ================================
   // GAIN / LOSS CALC
   // ================================
-  const calculateGainLoss = (
-    prevYard: string,
-    currentYard: string
-  ): number | '' => {
-    if (!prevYard || !currentYard) return '';
+ const normalizeFieldPosition = (
+  yard: number
+): number => {
 
-    const getYardValue = (str: string): number => {
-      const match = str.match(/(\d+)/);
+  // Own side:
+  // -20 becomes 20
+  // -45 becomes 45
 
-      let y = match ? parseInt(match[0]) : 50;
+  if (yard < 0) {
+    return Math.abs(yard);
+  }
 
-      // Opponent side
-      if (str.toUpperCase().includes('O')) {
-        y = 100 - y;
-      }
+  // Opponent side:
+  // 45 becomes 55
+  // 30 becomes 70
+  // 15 becomes 85
 
-      return y;
-    };
+  return 50 + (50 - yard);
+};
 
-    return (
-      getYardValue(currentYard) -
-      getYardValue(prevYard)
-    );
-  };
+const calculateGainLoss = (
+  prevYard: number | '',
+  currentYard: number | ''
+): number | '' => {
 
+  if (
+    prevYard === '' ||
+    currentYard === ''
+  ) {
+    return '';
+  }
+
+  const prev =
+    normalizeFieldPosition(prevYard);
+
+  const current =
+    normalizeFieldPosition(currentYard);
+
+  return current - prev;
+};
   // ================================
   // AUTO DOWN / DISTANCE
   // ================================
@@ -200,10 +215,21 @@ export default function LiveEntry() {
     let newDist: number | '' = 10;
 
     // First down
-    if (gain >= dist) {
-      newDown = 1;
-      newDist = 10;
-    }
+ if (gain >= dist) {
+
+  newDown = 1;
+
+  // Goal-to-go logic
+  if (
+    typeof next.yardLine === 'number' &&
+    next.yardLine > 0 &&
+    next.yardLine <= 10
+  ) {
+    newDist = next.yardLine;
+  } else {
+    newDist = 10;
+  }
+}
 
     // Normal progression
     else if (
@@ -457,8 +483,8 @@ export default function LiveEntry() {
       id: data.length + 1,
       playNumber: data.length + 1,
       odk: 'O',
-      down: '',
-      dist: '',
+      down: 1,
+      dist: 10,
       hash: '',
       gnls: '',
       yardLine: '',
