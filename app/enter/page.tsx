@@ -318,14 +318,23 @@ const calculateGainLoss = (
   rowIndex > 0
 ) {
 
+  const currentYard =
+    newValue === ''
+      ? ''
+      : Number(newValue);
+
+  // Update yard line value
+  newData[rowIndex].yardLine =
+    currentYard;
+
   // Calculate previous play gain/loss
   newData[rowIndex - 1].gnls =
     calculateGainLoss(
       newData[rowIndex - 1].yardLine,
-      Number(newValue)
+      currentYard
     );
 
-  // Auto update next down/distance
+  // Auto update next down/dist
   updateNextDownDistance(
     newData,
     rowIndex - 1
