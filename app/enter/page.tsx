@@ -13,11 +13,11 @@ type PlayEntry = {
   id: number;
   playNumber: number;
   odk: string;
-  down: number | null | '';
-  dist: number | null | '';
+  down: number | '' | 'TO';
+  dist: number | '';
   hash: string;
-  gnls: number | null | '';
-  yardLine: number | null | '';
+  gnls: number | '';
+  yardLine: number | '';
   playType: string;
   result: string;
   offFormation: string;
@@ -161,22 +161,46 @@ if (rows.length > 0) {
   // ================================
   // GAIN / LOSS CALC
   // ================================
-  // Coordinate system: own endzone = -50, midfield = 0, opp endzone = +50
-  // Own 20 = -20, opp 30 = 30, gain = current - prev (positive = forward, negative = loss)
-  const calculateGainLoss = (
-    prevYard: number | null | '',
-    currentYard: number | null | ''
-  ): number | '' => {
-    if (
-      prevYard === '' ||
-      prevYard === null ||
-      currentYard === '' ||
-      currentYard === null
-    ) {
-      return '';
-    }
-    return currentYard - prevYard;
-  };
+ const normalizeFieldPosition = (
+  yard: number
+): number => {
+
+  // Own side:
+  // -20 becomes 20
+  // -45 becomes 45
+
+  if (yard < 0) {
+    return Math.abs(yard);
+  }
+
+  // Opponent side:
+  // 45 becomes 55
+  // 30 becomes 70
+  // 15 becomes 85
+
+  return 50 + (50 - yard);
+};
+
+const calculateGainLoss = (
+  prevYard: number | '',
+  currentYard: number | ''
+): number | '' => {
+
+  if (
+    prevYard === '' ||
+    currentYard === ''
+  ) {
+    return '';
+  }
+
+  const prev =
+    normalizeFieldPosition(prevYard);
+
+  const current =
+    normalizeFieldPosition(currentYard);
+
+  return current - prev;
+};
   // ================================
   // AUTO DOWN / DISTANCE
   // ================================
@@ -192,13 +216,9 @@ if (rows.length > 0) {
 
   // Must have complete values first
   if (
-    current.down === null ||
     current.down === '' ||
-    current.dist === null ||
     current.dist === '' ||
-    current.gnls === null ||
-    current.gnls === '' ||
-    current.gnls === '-'
+    current.gnls === ''
   ) {
     return;
   }
@@ -206,9 +226,6 @@ if (rows.length > 0) {
   const down = Number(current.down);
   const distance = Number(current.dist);
   const gain = Number(current.gnls);
-
-  // Safety net — should never happen given guards above, but prevents NaN propagation
-  if (isNaN(down) || isNaN(distance) || isNaN(gain)) return;
 
   let nextDown: number | '' = '';
   let nextDistance: number | '' = '';
@@ -220,15 +237,13 @@ if (rows.length > 0) {
 
     nextDown = 1;
 
-    // Coordinate system: own endzone = -50, midfield = 0, opp endzone = +50
-    // Goal-to-go: new line of scrimmage is between 40 and 50 (inside opp 10)
-    // Distance to goal = 50 - yardLine (e.g. on the 45 → 5 yards to go)
+    // Goal-to-go logic
     if (
       typeof next.yardLine === 'number' &&
-      next.yardLine >= 40 &&
-      next.yardLine < 50
+      next.yardLine > 0 &&
+      next.yardLine <= 10
     ) {
-      nextDistance = 50 - next.yardLine;
+      nextDistance = next.yardLine;
     } else {
       nextDistance = 10;
     }
@@ -280,96 +295,54 @@ if (rows.length > 0) {
   // ================================
   // UPDATE CELL
   // ================================
-const updateRow = (
-  rowIndex: number,
-  columnId: string,
-  newValue: any
-) => {
+  const updateRow = (
+    rowIndex: number,
+    columnId: string,
+    newValue: any
+  ) => {
+    const newData = [...data];
 
-  const newData = [...data];
+    (newData[rowIndex] as any)[columnId] =
+      newValue;
 
-  // =========================
-  // FORCE NUMBERS
-  // =========================
-  const numericFields = [
-    'down',
-    'dist',
-    'gnls',
-    'yardLine',
-  ];
+    // Manual override protection
+    if (
+      ['down', 'dist', 'gnls'].includes(
+        columnId
+      )
+    ) {
+      newData[rowIndex].manualOverride = true;
+    }
 
-  const formattedValue =
-    numericFields.includes(columnId)
-      ? newValue === '' || newValue === null || newValue === undefined
-        ? ''
-        : newValue === '-'
-          ? '-'                          // allow in-progress negative entry
-          : isNaN(Number(newValue))
-            ? ''
-            : Number(newValue)
-      : newValue;
+    // Auto gain/loss from yard line
+    if (
+      columnId === 'yardLine' &&
+      rowIndex > 0
+    ) {
+      newData[rowIndex - 1].gnls =
+        calculateGainLoss(
+          newData[rowIndex - 1].yardLine,
+          newValue
+        );
+    }
 
-  (newData[rowIndex] as any)[columnId] =
-    formattedValue;
-
-  // =========================
-  // MANUAL OVERRIDE
-  // =========================
-  if (
-    ['down', 'dist'].includes(columnId)
-  ) {
-    newData[rowIndex].manualOverride = true;
-  }
-
-  // =========================
-  // AUTO GAIN/LOSS
-  // =========================
-  if (
-    columnId === 'yardLine' &&
-    rowIndex > 0
-  ) {
-
-    const previousYard =
-      newData[rowIndex - 1].yardLine;
-
-    const currentYard =
-      formattedValue;
-
-    const gainLoss =
-      calculateGainLoss(
-        previousYard,
-        currentYard
+    // Auto next down/dist
+    if (
+      ['gnls', 'down', 'dist'].includes(
+        columnId
+      ) &&
+      rowIndex < newData.length - 1 &&
+      !newData[rowIndex + 1]
+        .manualOverride
+    ) {
+      updateNextDownDistance(
+        newData,
+        rowIndex
       );
+    }
 
-    // Store calculated GN/LS
-    newData[rowIndex - 1].gnls =
-      gainLoss;
-
-    // IMMEDIATELY update next down/dist
-    updateNextDownDistance(
-      newData,
-      rowIndex - 1
-    );
-  }
-
-  // =========================
-  // MANUAL GN/LS EDIT
-  // =========================
-  if (
-    ['gnls', 'down', 'dist'].includes(
-      columnId
-    ) &&
-    rowIndex < newData.length - 1
-  ) {
-
-    updateNextDownDistance(
-      newData,
-      rowIndex
-    );
-  }
-
-  setData(newData);
-};
+    setData(newData);
+  };
 
   // ================================
   // NAVIGATION
