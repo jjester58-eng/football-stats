@@ -13,7 +13,7 @@ type PlayEntry = {
   id: number;
   playNumber: number;
   odk: string;
-  down: number | '' ;
+  down: number | '' | 'TO';
   dist: number | '';
   hash: string;
   gnls: number | '';
@@ -295,67 +295,95 @@ const calculateGainLoss = (
   // ================================
   // UPDATE CELL
   // ================================
-  const updateRow = (
-    rowIndex: number,
-    columnId: string,
-    newValue: any
-  ) => {
-    const newData = [...data];
+  // ================================
+// UPDATE CELL
+// ================================
+const updateRow = (
+  rowIndex: number,
+  columnId: string,
+  newValue: any
+) => {
 
-    (newData[rowIndex] as any)[columnId] =
-      newValue;
+  const newData = [...data];
 
-    // Manual override protection
-    if (
-  ['down', 'dist'].includes(columnId)
-) {
-  newData[rowIndex].manualOverride = true;
-}
+  // =========================
+  // FORCE NUMBERS
+  // =========================
+  const numericFields = [
+    'down',
+    'dist',
+    'gnls',
+    'yardLine',
+  ];
 
-    // Auto gain/loss from yard line
-   if (
-  columnId === 'yardLine' &&
-  rowIndex > 0
-) {
+  const formattedValue =
+    numericFields.includes(columnId)
+      ? newValue === ''
+        ? ''
+        : Number(newValue)
+      : newValue;
 
-  const currentYard =
-    newValue === ''
-      ? ''
-      : Number(newValue);
+  (newData[rowIndex] as any)[columnId] =
+    formattedValue;
 
-  // Update yard line value
-  newData[rowIndex].yardLine =
-    currentYard;
+  // =========================
+  // MANUAL OVERRIDE
+  // =========================
+  if (
+    ['down', 'dist'].includes(columnId)
+  ) {
+    newData[rowIndex].manualOverride = true;
+  }
 
-  // Calculate previous play gain/loss
-  newData[rowIndex - 1].gnls =
-    calculateGainLoss(
-      newData[rowIndex - 1].yardLine,
-      currentYard
+  // =========================
+  // AUTO GAIN/LOSS
+  // =========================
+  if (
+    columnId === 'yardLine' &&
+    rowIndex > 0
+  ) {
+
+    const previousYard =
+      newData[rowIndex - 1].yardLine;
+
+    const currentYard =
+      formattedValue;
+
+    const gainLoss =
+      calculateGainLoss(
+        previousYard,
+        currentYard
+      );
+
+    // Store calculated GN/LS
+    newData[rowIndex - 1].gnls =
+      gainLoss;
+
+    // IMMEDIATELY update next down/dist
+    updateNextDownDistance(
+      newData,
+      rowIndex - 1
     );
+  }
 
-  // Auto update next down/dist
-  updateNextDownDistance(
-    newData,
-    rowIndex - 1
-  );
-}
+  // =========================
+  // MANUAL GN/LS EDIT
+  // =========================
+  if (
+    ['gnls', 'down', 'dist'].includes(
+      columnId
+    ) &&
+    rowIndex < newData.length - 1
+  ) {
 
-    // Auto next down/dist
-    if (
-  ['gnls', 'down', 'dist'].includes(
-    columnId
-  ) &&
-  rowIndex < newData.length - 1
-) {
-  updateNextDownDistance(
-    newData,
-    rowIndex
-  );
-}
+    updateNextDownDistance(
+      newData,
+      rowIndex
+    );
+  }
 
-    setData(newData);
-  };
+  setData(newData);
+};
 
   // ================================
   // NAVIGATION
