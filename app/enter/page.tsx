@@ -140,61 +140,100 @@ export default function LiveEntry() {
     setSelectedCell({ row: newRow, col: newCol });
   };
 
-  function EditableCell({ value, rowIndex, columnId, colIndex }: { 
-    value: any; 
-    rowIndex: number; 
-    columnId: string;
-    colIndex: number;
-  }) {
-    const isSelected = selectedCell.row === rowIndex && selectedCell.col === colIndex;
-    const [editing, setEditing] = useState(false);
-    const [val, setVal] = useState(value?.toString() || '');
+  function EditableCell({
+  value,
+  rowIndex,
+  columnId,
+  colIndex,
+}: {
+  value: any;
+  rowIndex: number;
+  columnId: string;
+  colIndex: number;
+}) {
+  const isSelected =
+    selectedCell.row === rowIndex &&
+    selectedCell.col === colIndex;
 
-    const handleSave = () => {
-      setEditing(false);
-      updateRow(rowIndex, columnId, val === '' ? '' : val);
-    };
+  const inputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-      if (isSelected && !editing) {
-        const timer = setTimeout(() => setEditing(true), 5);
-        return () => clearTimeout(timer);
+  useEffect(() => {
+    if (isSelected && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isSelected]);
+
+  return (
+    <input
+      ref={inputRef}
+      value={value ?? ''}
+      onChange={(e) =>
+        updateRow(rowIndex, columnId, e.target.value)
       }
-    }, [isSelected, editing]);
-
-    return editing ? (
-      <input
-        autoFocus
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            handleSave();
-            moveToCell(rowIndex + 1, colIndex);
-          }
-          if (e.key === 'Tab') {
+      onClick={() =>
+        setSelectedCell({
+          row: rowIndex,
+          col: colIndex,
+        })
+      }
+      onKeyDown={(e) => {
+        switch (e.key) {
+          case 'Enter':
             e.preventDefault();
-            moveToCell(rowIndex, colIndex + 1);
-          }
-          if (e.key === 'ArrowDown') moveToCell(rowIndex + 1, colIndex);
-          if (e.key === 'ArrowUp') moveToCell(rowIndex - 1, colIndex);
-          if (e.key === 'ArrowRight') moveToCell(rowIndex, colIndex + 1);
-          if (e.key === 'ArrowLeft') moveToCell(rowIndex, colIndex - 1);
-        }}
-        className="w-full bg-zinc-900 border-2 border-blue-500 px-3 py-1 text-center outline-none"
-      />
-    ) : (
-      <div
-        onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
-        className={`min-h-[38px] px-3 py-1 cursor-text hover:bg-zinc-800 flex items-center border border-transparent ${
-          isSelected ? 'border-blue-500 bg-zinc-800' : ''
-        }`}
-      >
-        {value ?? ''}
-      </div>
-    );
-  }
+            moveToCell(rowIndex + 1, colIndex);
+            break;
+
+          case 'Tab':
+            e.preventDefault();
+
+            if (e.shiftKey) {
+              moveToCell(rowIndex, colIndex - 1);
+            } else {
+              moveToCell(rowIndex, colIndex + 1);
+            }
+            break;
+
+          case 'ArrowDown':
+            e.preventDefault();
+            moveToCell(rowIndex + 1, colIndex);
+            break;
+
+          case 'ArrowUp':
+            e.preventDefault();
+            moveToCell(rowIndex - 1, colIndex);
+            break;
+
+          case 'ArrowRight':
+            if (
+              inputRef.current &&
+              inputRef.current.selectionStart ===
+                inputRef.current.value.length
+            ) {
+              e.preventDefault();
+              moveToCell(rowIndex, colIndex + 1);
+            }
+            break;
+
+          case 'ArrowLeft':
+            if (
+              inputRef.current &&
+              inputRef.current.selectionStart === 0
+            ) {
+              e.preventDefault();
+              moveToCell(rowIndex, colIndex - 1);
+            }
+            break;
+        }
+      }}
+      className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
+        isSelected
+          ? 'border-blue-500 bg-zinc-800'
+          : 'border-transparent hover:border-zinc-700'
+      }`}
+    />
+  );
+}
 
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
@@ -251,7 +290,14 @@ export default function LiveEntry() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row, rowIndex) => (
-                <tr key={row.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                <tr
+  key={row.id}
+  className={`border-b border-zinc-800 ${
+    selectedCell.row === rowIndex
+      ? 'bg-zinc-800/70'
+      : 'hover:bg-zinc-800/50'
+  }`}
+>
                   {row.getVisibleCells().map((cell, colIndex) => (
                     <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
                       <EditableCell
