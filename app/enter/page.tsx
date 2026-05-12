@@ -32,18 +32,36 @@ type PlayEntry = {
 };
 
 export default function LiveEntry() {
-  const [data, setData] = useState<PlayEntry[]>([
-    {
-      id: 1, playNumber: 1, odk: 'O', down: 1, dist: 10, hash: 'M',
-      gnls: '', yardLine: 'M-40', playType: '', result: '',
-      offFormation: '', defense: '', motion: '', offPlay: '', rpo: '',
-      playDir: '', stunt: '', blitz: '', coverage: ''
+  // Pre-fill 200 rows
+  const [data, setData] = useState<PlayEntry[]>(() => {
+    const rows: PlayEntry[] = [];
+    for (let i = 1; i <= 200; i++) {
+      rows.push({
+        id: i,
+        playNumber: i,
+        odk: i % 3 === 0 ? 'D' : 'O',   // Alternate O and D
+        down: '',
+        dist: '',
+        hash: '',
+        gnls: '',
+        yardLine: '',
+        playType: '',
+        result: '',
+        offFormation: '',
+        defense: '',
+        motion: '',
+        offPlay: '',
+        rpo: '',
+        playDir: '',
+        stunt: '',
+        blitz: '',
+        coverage: '',
+      });
     }
-  ]);
+    return rows;
+  });
 
   const [selectedCell, setSelectedCell] = useState<{ row: number; col: number }>({ row: 0, col: 0 });
-
-  const inputRefs = useRef<(HTMLInputElement | null)[][]>([]);
 
   const columnHelper = createColumnHelper<PlayEntry>();
 
@@ -68,29 +86,22 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // ================== IMPROVED GAIN/LOSS LOGIC ==================
+  // ================== GAIN/LOSS LOGIC ==================
   const calculateGainLoss = (prevYard: string, currentYard: string): number | '' => {
     if (!prevYard || !currentYard) return '';
-
-    const getYardValue = (yardStr: string): number => {
-      const match = yardStr.match(/(\d+)/);
-      let yards = match ? parseInt(match[0]) : 50;
-
-      if (yardStr.toUpperCase().includes('O') || yardStr.toUpperCase().includes('OWN')) {
-        yards = 100 - yards; // Convert Own 40 → 60 from opponent perspective
-      }
-      return yards;
+    const getYardValue = (str: string): number => {
+      const match = str.match(/(\d+)/);
+      let y = match ? parseInt(match[0]) : 50;
+      if (str.toUpperCase().includes('O')) y = 100 - y;
+      return y;
     };
-
-    const prev = getYardValue(prevYard);
-    const curr = getYardValue(currentYard);
-    return curr - prev;
+    return getYardValue(currentYard) - getYardValue(prevYard);
   };
 
   const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
     const current = plays[index];
     const next = plays[index + 1];
-    if (!next || current.gnls === '' || current.gnls === null) return;
+    if (!next || current.gnls === '') return;
 
     const gain = Number(current.gnls);
     const dist = Number(current.dist || 10);
@@ -112,8 +123,7 @@ export default function LiveEntry() {
     (newData[rowIndex] as any)[columnId] = newValue;
 
     if (columnId === 'yardLine' && rowIndex > 0) {
-      const gain = calculateGainLoss(newData[rowIndex - 1].yardLine, newValue);
-      newData[rowIndex - 1].gnls = gain;
+      newData[rowIndex - 1].gnls = calculateGainLoss(newData[rowIndex - 1].yardLine, newValue);
     }
 
     if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
@@ -123,7 +133,7 @@ export default function LiveEntry() {
     setData(newData);
   };
 
-  // ================== KEYBOARD NAVIGATION ==================
+  // Keyboard Navigation
   const moveToCell = (row: number, col: number) => {
     const newRow = Math.max(0, Math.min(row, data.length - 1));
     const newCol = Math.max(0, Math.min(col, columns.length - 1));
@@ -147,10 +157,10 @@ export default function LiveEntry() {
 
     useEffect(() => {
       if (isSelected && !editing) {
-        const timer = setTimeout(() => setEditing(true), 10);
+        const timer = setTimeout(() => setEditing(true), 5);
         return () => clearTimeout(timer);
       }
-    }, [isSelected]);
+    }, [isSelected, editing]);
 
     return editing ? (
       <input
@@ -161,7 +171,7 @@ export default function LiveEntry() {
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             handleSave();
-            moveToCell(rowIndex + 1, colIndex); // Move down
+            moveToCell(rowIndex + 1, colIndex);
           }
           if (e.key === 'Tab') {
             e.preventDefault();
@@ -177,8 +187,8 @@ export default function LiveEntry() {
     ) : (
       <div
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
-        className={`min-h-[38px] px-3 py-1 cursor-text hover:bg-zinc-800 flex items-center ${
-          isSelected ? 'border-2 border-blue-500' : ''
+        className={`min-h-[38px] px-3 py-1 cursor-text hover:bg-zinc-800 flex items-center border border-transparent ${
+          isSelected ? 'border-blue-500 bg-zinc-800' : ''
         }`}
       >
         {value ?? ''}
@@ -198,7 +208,6 @@ export default function LiveEntry() {
       offPlay: '', rpo: '', playDir: '', stunt: '', blitz: '', coverage: ''
     };
     setData([...data, newPlay]);
-    setSelectedCell({ row: data.length, col: 0 });
   };
 
   return (
@@ -212,14 +221,14 @@ export default function LiveEntry() {
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
               <p className="text-emerald-500 flex items-center gap-2">
-                <Users size={18} /> Arrow Keys + Tab + Enter Navigation
+                <Users size={18} /> 200 rows pre-loaded • Arrow Keys Navigation
               </p>
             </div>
           </div>
 
           <div className="flex gap-3">
             <button onClick={addNewRow} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-2xl">
-              <Plus size={20} /> New Play
+              <Plus size={20} /> Add Row
             </button>
             <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-2xl font-semibold">
               <Save size={20} /> Save Game
@@ -227,7 +236,7 @@ export default function LiveEntry() {
           </div>
         </div>
 
-        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900">
+        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
           <table className="w-full border-collapse">
             <thead>
               {table.getHeaderGroups().map(headerGroup => (
@@ -242,7 +251,7 @@ export default function LiveEntry() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row, rowIndex) => (
-                <tr key={row.id} className="border-b border-zinc-800 hover:bg-zinc-800/70">
+                <tr key={row.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
                   {row.getVisibleCells().map((cell, colIndex) => (
                     <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
                       <EditableCell
