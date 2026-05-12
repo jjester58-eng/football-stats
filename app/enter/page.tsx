@@ -9,15 +9,18 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 
+// Numeric fields use '' for blank, '-' for in-progress negative entry, or a number
+type NumericField = number | '' | '-';
+
 type PlayEntry = {
   id: number;
   playNumber: number;
   odk: string;
-  down: number | '' | 'TO';
-  dist: number | '';
+  down: NumericField;
+  dist: NumericField;
   hash: string;
-  gnls: number | '';
-  yardLine: number | '';
+  gnls: NumericField;
+  yardLine: NumericField;
   playType: string;
   result: string;
   offFormation: string;
@@ -34,6 +37,29 @@ type PlayEntry = {
   manualOverride?: boolean;
 };
 
+// ================================
+// FIELD POSITION HELPERS
+// ================================
+// Coordinate system:
+//   own endzone ≈ -50, own 20 = -20, midfield = 0
+//   opp 20 = 20, opp 10 = 10, opp 5 = 5, opp goal line ≈ +50
+// User enters own side as negative (-20, -40), opp side as positive (30, 10, 5)
+// Gain/loss = currentYard - prevYard  (positive = forward, negative = loss)
+// Goal-to-go: yardLine is between 1 and 10 → distance = yardLine
+
+const isBlank = (v: NumericField): v is '' | '-' =>
+  v === '' || v === '-';
+
+const toNum = (v: NumericField): number => Number(v);
+
+const calculateGainLoss = (
+  prevYard: NumericField,
+  currentYard: NumericField
+): NumericField => {
+  if (isBlank(prevYard) || isBlank(currentYard)) return '';
+  return toNum(currentYard) - toNum(prevYard);
+};
+
 export default function LiveEntry() {
   // ================================
   // INITIAL DATA
@@ -41,36 +67,36 @@ export default function LiveEntry() {
   const [data, setData] = useState<PlayEntry[]>(() => {
     const rows: PlayEntry[] = [];
 
-  for (let i = 1; i <= 200; i++) {
-  rows.push({
-    id: i,
-    playNumber: i,
-    odk: i % 3 === 0 ? 'D' : 'O',
-    down: '',
-    dist: '',
-    hash: '',
-    gnls: '',
-    yardLine: '',
-    playType: '',
-    result: '',
-    offFormation: '',
-    defense: '',
-    motion: '',
-    offPlay: '',
-    rpo: '',
-    playDir: '',
-    stunt: '',
-    blitz: '',
-    coverage: '',
-    manualOverride: false,
-  });
-}
+    for (let i = 1; i <= 200; i++) {
+      rows.push({
+        id: i,
+        playNumber: i,
+        odk: i % 3 === 0 ? 'D' : 'O',
+        down: '',
+        dist: '',
+        hash: '',
+        gnls: '',
+        yardLine: '',
+        playType: '',
+        result: '',
+        offFormation: '',
+        defense: '',
+        motion: '',
+        offPlay: '',
+        rpo: '',
+        playDir: '',
+        stunt: '',
+        blitz: '',
+        coverage: '',
+        manualOverride: false,
+      });
+    }
 
-// ONLY first row starts 1st & 10
-if (rows.length > 0) {
-  rows[0].down = 1;
-  rows[0].dist = 10;
-}
+    // ONLY first row starts 1st & 10
+    if (rows.length > 0) {
+      rows[0].down = 1;
+      rows[0].dist = 10;
+    }
     return rows;
   });
 
@@ -85,212 +111,98 @@ if (rows.length > 0) {
   const columnHelper = createColumnHelper<PlayEntry>();
 
   const columns = [
-    columnHelper.accessor('playNumber', {
-      header: 'PLAY #',
-    }),
-
-    columnHelper.accessor('odk', {
-      header: 'ODK',
-    }),
-
-    columnHelper.accessor('down', {
-      header: 'DN',
-    }),
-
-    columnHelper.accessor('dist', {
-      header: 'DIST',
-    }),
-
-    columnHelper.accessor('hash', {
-      header: 'HASH',
-    }),
-
-    columnHelper.accessor('gnls', {
-      header: 'GN/LS',
-    }),
-
-    columnHelper.accessor('yardLine', {
-      header: 'YARD LN',
-    }),
-
-    columnHelper.accessor('playType', {
-      header: 'PLAY TYPE',
-    }),
-
-    columnHelper.accessor('result', {
-      header: 'RESULT',
-    }),
-
-    columnHelper.accessor('offFormation', {
-      header: 'OFF FORM',
-    }),
-
-    columnHelper.accessor('defense', {
-      header: 'DEFENSE',
-    }),
-
-    columnHelper.accessor('motion', {
-      header: 'MOTION',
-    }),
-
-    columnHelper.accessor('offPlay', {
-      header: 'OFF PLAY',
-    }),
-
-    columnHelper.accessor('rpo', {
-      header: 'RPO',
-    }),
-
-    columnHelper.accessor('playDir', {
-      header: 'DIR',
-    }),
-
-    columnHelper.accessor('stunt', {
-      header: 'STUNT',
-    }),
-
-    columnHelper.accessor('blitz', {
-      header: 'BLITZ',
-    }),
-
-    columnHelper.accessor('coverage', {
-      header: 'COVERAGE',
-    }),
+    columnHelper.accessor('playNumber',   { header: 'PLAY #' }),
+    columnHelper.accessor('odk',          { header: 'ODK' }),
+    columnHelper.accessor('down',         { header: 'DN' }),
+    columnHelper.accessor('dist',         { header: 'DIST' }),
+    columnHelper.accessor('hash',         { header: 'HASH' }),
+    columnHelper.accessor('gnls',         { header: 'GN/LS' }),
+    columnHelper.accessor('yardLine',     { header: 'YARD LN' }),
+    columnHelper.accessor('playType',     { header: 'PLAY TYPE' }),
+    columnHelper.accessor('result',       { header: 'RESULT' }),
+    columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
+    columnHelper.accessor('defense',      { header: 'DEFENSE' }),
+    columnHelper.accessor('motion',       { header: 'MOTION' }),
+    columnHelper.accessor('offPlay',      { header: 'OFF PLAY' }),
+    columnHelper.accessor('rpo',          { header: 'RPO' }),
+    columnHelper.accessor('playDir',      { header: 'DIR' }),
+    columnHelper.accessor('stunt',        { header: 'STUNT' }),
+    columnHelper.accessor('blitz',        { header: 'BLITZ' }),
+    columnHelper.accessor('coverage',     { header: 'COVERAGE' }),
   ];
 
-  // ================================
-  // GAIN / LOSS CALC
-  // ================================
- const normalizeFieldPosition = (
-  yard: number
-): number => {
-
-  // Own side:
-  // -20 becomes 20
-  // -45 becomes 45
-
-  if (yard < 0) {
-    return Math.abs(yard);
-  }
-
-  // Opponent side:
-  // 45 becomes 55
-  // 30 becomes 70
-  // 15 becomes 85
-
-  return 50 + (50 - yard);
-};
-
-const calculateGainLoss = (
-  prevYard: number | '',
-  currentYard: number | ''
-): number | '' => {
-
-  if (
-    prevYard === '' ||
-    currentYard === ''
-  ) {
-    return '';
-  }
-
-  const prev =
-    normalizeFieldPosition(prevYard);
-
-  const current =
-    normalizeFieldPosition(currentYard);
-
-  return current - prev;
-};
   // ================================
   // AUTO DOWN / DISTANCE
   // ================================
   const updateNextDownDistance = (
-  plays: PlayEntry[],
-  index: number
-) => {
+    plays: PlayEntry[],
+    index: number
+  ) => {
+    const current = plays[index];
+    const next    = plays[index + 1];
 
-  const current = plays[index];
-  const next = plays[index + 1];
+    if (!next) return;
 
-  if (!next) return;
-
-  // Must have complete values first
-  if (
-    current.down === '' ||
-    current.dist === '' ||
-    current.gnls === ''
-  ) {
-    return;
-  }
-
-  const down = Number(current.down);
-  const distance = Number(current.dist);
-  const gain = Number(current.gnls);
-
-  let nextDown: number | '' = '';
-  let nextDistance: number | '' = '';
-
-  // =========================
-  // FIRST DOWN
-  // =========================
-  if (gain >= distance) {
-
-    nextDown = 1;
-
-    // Goal-to-go logic
+    // Need all three to be real numbers before we can calculate
     if (
-      typeof next.yardLine === 'number' &&
-      next.yardLine > 0 &&
-      next.yardLine <= 10
-    ) {
-      nextDistance = next.yardLine;
-    } else {
-      nextDistance = 10;
+      isBlank(current.down) ||
+      isBlank(current.dist) ||
+      isBlank(current.gnls)
+    ) return;
+
+    const down     = toNum(current.down);
+    const distance = toNum(current.dist);
+    const gain     = toNum(current.gnls);
+
+    if (isNaN(down) || isNaN(distance) || isNaN(gain)) return;
+
+    let nextDown: NumericField     = '';
+    let nextDistance: NumericField = '';
+
+    // =========================
+    // FIRST DOWN
+    // =========================
+    if (gain >= distance) {
+      nextDown = 1;
+
+      // Goal-to-go: next yard line is between 1 and 10
+      // distance to score = the yard line value itself (e.g. on the 8 → 8 to go)
+      const nextYard = next.yardLine;
+      if (
+        !isBlank(nextYard) &&
+        toNum(nextYard) >= 1 &&
+        toNum(nextYard) <= 10
+      ) {
+        nextDistance = toNum(nextYard);
+      } else {
+        nextDistance = 10;
+      }
     }
-  }
 
-  // =========================
-  // NORMAL PROGRESSION
-  // =========================
-  else if (down < 4) {
+    // =========================
+    // NORMAL PROGRESSION
+    // =========================
+    else if (down < 4) {
+      nextDown     = down + 1;
+      nextDistance = Math.max(1, distance - gain);
+    }
 
-    nextDown = down + 1;
+    // =========================
+    // 4TH DOWN — leave blank, operator decides
+    // =========================
+    else {
+      nextDown     = '';
+      nextDistance = '';
+    }
 
-    nextDistance = Math.max(
-      1,
-      distance - gain
-    );
-  }
-
-  // =========================
-  // 4TH DOWN FAILED
-  // =========================
-  else {
-
-    // DO NOT AUTO TURNOVER
-    // Leave blank for operator decision
-
-    nextDown = '';
-    nextDistance = '';
-  }
-
-  // =========================
-  // ONLY FILL BLANKS
-  // =========================
-  if (
-    next.down === '' &&
-    !next.manualOverride
-  ) {
-    next.down = nextDown;
-  }
-
-  if (
-    next.dist === '' &&
-    !next.manualOverride
-  ) {
-    next.dist = nextDistance;
-  }
-};
+    // Only fill if the cell is still blank and not manually overridden
+    if (next.down === '' && !next.manualOverride) {
+      next.down = nextDown;
+    }
+    if (next.dist === '' && !next.manualOverride) {
+      next.dist = nextDistance;
+    }
+  };
 
   // ================================
   // UPDATE CELL
@@ -302,43 +214,56 @@ const calculateGainLoss = (
   ) => {
     const newData = [...data];
 
-    (newData[rowIndex] as any)[columnId] =
-      newValue;
+    const numericFields = ['down', 'dist', 'gnls', 'yardLine'];
 
-    // Manual override protection
-    if (
-      ['down', 'dist', 'gnls'].includes(
-        columnId
-      )
-    ) {
+    let formattedValue: any;
+
+    if (numericFields.includes(columnId)) {
+      if (newValue === '' || newValue === null || newValue === undefined) {
+        formattedValue = '';
+      } else if (newValue === '-') {
+        // Allow '-' while the user is typing a negative number
+        formattedValue = '-';
+      } else if (isNaN(Number(newValue))) {
+        formattedValue = '';
+      } else {
+        formattedValue = Number(newValue);
+      }
+    } else {
+      formattedValue = newValue;
+    }
+
+    (newData[rowIndex] as any)[columnId] = formattedValue;
+
+    // Manual override flag for down/dist so auto-fill won't overwrite
+    if (['down', 'dist'].includes(columnId)) {
       newData[rowIndex].manualOverride = true;
     }
 
-    // Auto gain/loss from yard line
-    if (
-      columnId === 'yardLine' &&
-      rowIndex > 0
-    ) {
-      newData[rowIndex - 1].gnls =
-        calculateGainLoss(
-          newData[rowIndex - 1].yardLine,
-          newValue
-        );
+    // =========================
+    // AUTO GAIN/LOSS
+    // Entering yardLine → calculate gnls for the previous row
+    // =========================
+    if (columnId === 'yardLine' && rowIndex > 0) {
+      const previousYard = newData[rowIndex - 1].yardLine;
+      const currentYard  = formattedValue as NumericField;
+
+      newData[rowIndex - 1].gnls = calculateGainLoss(
+        previousYard,
+        currentYard
+      );
+
+      updateNextDownDistance(newData, rowIndex - 1);
     }
 
-    // Auto next down/dist
+    // =========================
+    // PROPAGATE DOWN/DIST on manual gnls/down/dist edit
+    // =========================
     if (
-      ['gnls', 'down', 'dist'].includes(
-        columnId
-      ) &&
-      rowIndex < newData.length - 1 &&
-      !newData[rowIndex + 1]
-        .manualOverride
+      ['gnls', 'down', 'dist'].includes(columnId) &&
+      rowIndex < newData.length - 1
     ) {
-      updateNextDownDistance(
-        newData,
-        rowIndex
-      );
+      updateNextDownDistance(newData, rowIndex);
     }
 
     setData(newData);
@@ -347,23 +272,10 @@ const calculateGainLoss = (
   // ================================
   // NAVIGATION
   // ================================
-  const moveToCell = (
-    row: number,
-    col: number
-  ) => {
-    const newRow = Math.max(
-      0,
-      Math.min(row, data.length - 1)
-    );
-
-    const newCol = Math.max(
-      0,
-      Math.min(col, columns.length - 1)
-    );
-
+  const moveToCell = (row: number, col: number) => {
     setSelectedCell({
-      row: newRow,
-      col: newCol,
+      row: Math.max(0, Math.min(row, data.length - 1)),
+      col: Math.max(0, Math.min(col, columns.length - 1)),
     });
   };
 
@@ -385,110 +297,73 @@ const calculateGainLoss = (
       selectedCell.row === rowIndex &&
       selectedCell.col === colIndex;
 
-    const inputRef =
-      useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
-   useEffect(() => {
-  if (
-    isSelected &&
-    inputRef.current &&
-    document.activeElement !== inputRef.current
-  ) {
-    inputRef.current.focus();
-  }
-}, [isSelected]);
+    useEffect(() => {
+      if (
+        isSelected &&
+        inputRef.current &&
+        document.activeElement !== inputRef.current
+      ) {
+        inputRef.current.focus();
+      }
+    }, [isSelected]);
+
     return (
       <input
         ref={inputRef}
         value={value ?? ''}
         onChange={(e) =>
-          updateRow(
-            rowIndex,
-            columnId,
-            e.target.value
-          )
+          updateRow(rowIndex, columnId, e.target.value)
         }
         onClick={() =>
-          setSelectedCell({
-            row: rowIndex,
-            col: colIndex,
-          })
+          setSelectedCell({ row: rowIndex, col: colIndex })
         }
         onKeyDown={(e) => {
           switch (e.key) {
             case 'Enter':
               e.preventDefault();
-              moveToCell(
-                rowIndex + 1,
-                colIndex
-              );
+              moveToCell(rowIndex + 1, colIndex);
               break;
 
             case 'Tab':
               e.preventDefault();
-
               if (e.shiftKey) {
-                moveToCell(
-                  rowIndex,
-                  colIndex - 1
-                );
+                moveToCell(rowIndex, colIndex - 1);
               } else {
-                moveToCell(
-                  rowIndex,
-                  colIndex + 1
-                );
+                moveToCell(rowIndex, colIndex + 1);
               }
-
               break;
 
             case 'ArrowDown':
               e.preventDefault();
-              moveToCell(
-                rowIndex + 1,
-                colIndex
-              );
+              moveToCell(rowIndex + 1, colIndex);
               break;
 
             case 'ArrowUp':
               e.preventDefault();
-              moveToCell(
-                rowIndex - 1,
-                colIndex
-              );
+              moveToCell(rowIndex - 1, colIndex);
               break;
 
             case 'ArrowRight':
               if (
                 inputRef.current &&
-                inputRef.current
-                  .selectionStart ===
-                  inputRef.current.value
-                    .length
+                inputRef.current.selectionStart ===
+                  inputRef.current.value.length
               ) {
                 e.preventDefault();
-
-                moveToCell(
-                  rowIndex,
-                  colIndex + 1
-                );
+                moveToCell(rowIndex, colIndex + 1);
               }
-
               break;
 
             case 'ArrowLeft':
               if (
                 inputRef.current &&
-                inputRef.current
-                  .selectionStart === 0
+                inputRef.current.selectionStart === 0
               ) {
                 e.preventDefault();
-
-                moveToCell(
-                  rowIndex,
-                  colIndex - 1
-                );
+                moveToCell(rowIndex, colIndex - 1);
               }
-
               break;
           }
         }}
@@ -507,8 +382,7 @@ const calculateGainLoss = (
   const table = useReactTable({
     data,
     columns,
-    getCoreRowModel:
-      getCoreRowModel(),
+    getCoreRowModel: getCoreRowModel(),
   });
 
   // ================================
@@ -537,7 +411,6 @@ const calculateGainLoss = (
       coverage: '',
       manualOverride: false,
     };
-
     setData([...data, newPlay]);
   };
 
@@ -550,13 +423,9 @@ const calculateGainLoss = (
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8">
-
           <div className="flex items-center gap-4">
-
             <button
-              onClick={() =>
-                window.history.back()
-              }
+              onClick={() => window.history.back()}
               className="flex items-center gap-2 text-zinc-400 hover:text-white"
             >
               <ArrowLeft size={22} />
@@ -567,7 +436,6 @@ const calculateGainLoss = (
               <h1 className="text-4xl font-bold">
                 Kangaroos Live Entry
               </h1>
-
               <p className="text-emerald-500 flex items-center gap-2">
                 <Users size={18} />
                 Spreadsheet Navigation
@@ -576,7 +444,6 @@ const calculateGainLoss = (
           </div>
 
           <div className="flex gap-3">
-
             <button
               onClick={addNewRow}
               className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-2xl"
@@ -589,86 +456,59 @@ const calculateGainLoss = (
               <Save size={20} />
               Save Game
             </button>
-
           </div>
         </div>
 
         {/* TABLE */}
         <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
-
           <table className="w-full border-collapse">
-
             <thead>
-              {table
-                .getHeaderGroups()
-                .map((headerGroup) => (
-                  <tr
-                    key={headerGroup.id}
-                    className="bg-zinc-950 border-b-2 border-zinc-600 sticky top-0 z-10"
-                  >
-                    {headerGroup.headers.map(
-                      (header) => (
-                        <th
-                          key={header.id}
-                          className="px-4 py-4 text-left text-xs font-semibold text-zinc-300 whitespace-nowrap"
-                        >
-                          {flexRender(
-                            header.column
-                              .columnDef.header,
-                            header.getContext()
-                          )}
-                        </th>
-                      )
-                    )}
-                  </tr>
-                ))}
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr
+                  key={headerGroup.id}
+                  className="bg-zinc-950 border-b-2 border-zinc-600 sticky top-0 z-10"
+                >
+                  {headerGroup.headers.map((header) => (
+                    <th
+                      key={header.id}
+                      className="px-4 py-4 text-left text-xs font-semibold text-zinc-300 whitespace-nowrap"
+                    >
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext()
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
             </thead>
 
             <tbody>
-              {table
-                .getRowModel()
-                .rows.map(
-                  (row, rowIndex) => (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-zinc-800 ${
-                        selectedCell.row ===
-                        rowIndex
-                          ? 'bg-zinc-800/70'
-                          : 'hover:bg-zinc-800/50'
-                      }`}
+              {table.getRowModel().rows.map((row, rowIndex) => (
+                <tr
+                  key={row.id}
+                  className={`border-b border-zinc-800 ${
+                    selectedCell.row === rowIndex
+                      ? 'bg-zinc-800/70'
+                      : 'hover:bg-zinc-800/50'
+                  }`}
+                >
+                  {row.getVisibleCells().map((cell, colIndex) => (
+                    <td
+                      key={cell.id}
+                      className="px-2 py-1 border-r border-zinc-800 last:border-r-0"
                     >
-                      {row
-                        .getVisibleCells()
-                        .map(
-                          (
-                            cell,
-                            colIndex
-                          ) => (
-                            <td
-                              key={cell.id}
-                              className="px-2 py-1 border-r border-zinc-800 last:border-r-0"
-                            >
-                              <EditableCell
-                                value={cell.getValue()}
-                                rowIndex={
-                                  rowIndex
-                                }
-                                columnId={
-                                  cell.column.id
-                                }
-                                colIndex={
-                                  colIndex
-                                }
-                              />
-                            </td>
-                          )
-                        )}
-                    </tr>
-                  )
-                )}
+                      <EditableCell
+                        value={cell.getValue()}
+                        rowIndex={rowIndex}
+                        columnId={cell.column.id}
+                        colIndex={colIndex}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
             </tbody>
-
           </table>
         </div>
       </div>
