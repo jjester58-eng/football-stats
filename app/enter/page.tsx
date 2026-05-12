@@ -17,7 +17,7 @@ type PlayEntry = {
   dist: number | '';
   hash: string;
   gnls: number | '';
-  yardLine: number | '';
+  yardLine: string;
   playType: string;
   result: string;
   offFormation: string;
@@ -181,9 +181,28 @@ if (rows.length > 0) {
   return 50 + (50 - yard);
 };
 
+```tsx
+const normalizeFieldPosition = (
+  yard: number
+): number => {
+
+  // Own side
+  // -20 -> 20
+  // -45 -> 45
+  if (yard < 0) {
+    return Math.abs(yard);
+  }
+
+  // Opponent side
+  // 45 -> 55
+  // 30 -> 70
+  // 15 -> 85
+  return 50 + (50 - yard);
+};
+
 const calculateGainLoss = (
-  prevYard: number | '',
-  currentYard: number | ''
+  prevYard: string,
+  currentYard: string
 ): number | '' => {
 
   if (
@@ -193,18 +212,29 @@ const calculateGainLoss = (
     return '';
   }
 
-  const prev =
-    normalizeFieldPosition(prevYard);
+  const prev = Number(prevYard);
+  const current = Number(currentYard);
 
-  const current =
-    normalizeFieldPosition(currentYard);
+  if (
+    isNaN(prev) ||
+    isNaN(current)
+  ) {
+    return '';
+  }
 
-  return current - prev;
+  const prevNormalized =
+    normalizeFieldPosition(prev);
+
+  const currentNormalized =
+    normalizeFieldPosition(current);
+
+  return currentNormalized - prevNormalized;
 };
-  // ================================
-  // AUTO DOWN / DISTANCE
-  // ================================
-  const updateNextDownDistance = (
+
+// ================================
+// AUTO DOWN / DISTANCE
+// ================================
+const updateNextDownDistance = (
   plays: PlayEntry[],
   index: number
 ) => {
@@ -214,7 +244,7 @@ const calculateGainLoss = (
 
   if (!next) return;
 
-  // Must have complete values first
+  // Require complete data first
   if (
     current.down === '' ||
     current.dist === '' ||
@@ -227,6 +257,15 @@ const calculateGainLoss = (
   const distance = Number(current.dist);
   const gain = Number(current.gnls);
 
+  // Prevent NaN issues
+  if (
+    isNaN(down) ||
+    isNaN(distance) ||
+    isNaN(gain)
+  ) {
+    return;
+  }
+
   let nextDown: number | '' = '';
   let nextDistance: number | '' = '';
 
@@ -237,14 +276,18 @@ const calculateGainLoss = (
 
     nextDown = 1;
 
-    // Goal-to-go logic
+    // Goal-to-go handling
     if (
-      typeof next.yardLine === 'number' &&
-      next.yardLine > 0 &&
-      next.yardLine <= 10
+      next.yardLine !== '' &&
+      Number(next.yardLine) > 0 &&
+      Number(next.yardLine) <= 10
     ) {
-      nextDistance = next.yardLine;
+
+      nextDistance =
+        Number(next.yardLine);
+
     } else {
+
       nextDistance = 10;
     }
   }
@@ -267,9 +310,7 @@ const calculateGainLoss = (
   // =========================
   else {
 
-    // DO NOT AUTO TURNOVER
-    // Leave blank for operator decision
-
+    // Leave blank
     nextDown = '';
     nextDistance = '';
   }
@@ -291,7 +332,7 @@ const calculateGainLoss = (
     next.dist = nextDistance;
   }
 };
-
+```
   // ================================
   // UPDATE CELL
   // ================================
