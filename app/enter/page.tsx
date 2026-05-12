@@ -13,11 +13,11 @@ type PlayEntry = {
   id: number;
   playNumber: number;
   odk: string;
-  down: number | '' | 'TO';
+  down: number | '' ;
   dist: number | '';
   hash: string;
   gnls: number | '';
-  yardLine: string;
+  yardLine: number | '';
   playType: string;
   result: string;
   offFormation: string;
@@ -181,28 +181,9 @@ if (rows.length > 0) {
   return 50 + (50 - yard);
 };
 
-```tsx
-const normalizeFieldPosition = (
-  yard: number
-): number => {
-
-  // Own side
-  // -20 -> 20
-  // -45 -> 45
-  if (yard < 0) {
-    return Math.abs(yard);
-  }
-
-  // Opponent side
-  // 45 -> 55
-  // 30 -> 70
-  // 15 -> 85
-  return 50 + (50 - yard);
-};
-
 const calculateGainLoss = (
-  prevYard: string,
-  currentYard: string
+  prevYard: number | '',
+  currentYard: number | ''
 ): number | '' => {
 
   if (
@@ -212,29 +193,18 @@ const calculateGainLoss = (
     return '';
   }
 
-  const prev = Number(prevYard);
-  const current = Number(currentYard);
+  const prev =
+    normalizeFieldPosition(prevYard);
 
-  if (
-    isNaN(prev) ||
-    isNaN(current)
-  ) {
-    return '';
-  }
+  const current =
+    normalizeFieldPosition(currentYard);
 
-  const prevNormalized =
-    normalizeFieldPosition(prev);
-
-  const currentNormalized =
-    normalizeFieldPosition(current);
-
-  return currentNormalized - prevNormalized;
+  return current - prev;
 };
-
-// ================================
-// AUTO DOWN / DISTANCE
-// ================================
-const updateNextDownDistance = (
+  // ================================
+  // AUTO DOWN / DISTANCE
+  // ================================
+  const updateNextDownDistance = (
   plays: PlayEntry[],
   index: number
 ) => {
@@ -244,7 +214,7 @@ const updateNextDownDistance = (
 
   if (!next) return;
 
-  // Require complete data first
+  // Must have complete values first
   if (
     current.down === '' ||
     current.dist === '' ||
@@ -257,15 +227,6 @@ const updateNextDownDistance = (
   const distance = Number(current.dist);
   const gain = Number(current.gnls);
 
-  // Prevent NaN issues
-  if (
-    isNaN(down) ||
-    isNaN(distance) ||
-    isNaN(gain)
-  ) {
-    return;
-  }
-
   let nextDown: number | '' = '';
   let nextDistance: number | '' = '';
 
@@ -276,18 +237,14 @@ const updateNextDownDistance = (
 
     nextDown = 1;
 
-    // Goal-to-go handling
+    // Goal-to-go logic
     if (
-      next.yardLine !== '' &&
-      Number(next.yardLine) > 0 &&
-      Number(next.yardLine) <= 10
+      typeof next.yardLine === 'number' &&
+      next.yardLine > 0 &&
+      next.yardLine <= 10
     ) {
-
-      nextDistance =
-        Number(next.yardLine);
-
+      nextDistance = next.yardLine;
     } else {
-
       nextDistance = 10;
     }
   }
@@ -310,7 +267,9 @@ const updateNextDownDistance = (
   // =========================
   else {
 
-    // Leave blank
+    // DO NOT AUTO TURNOVER
+    // Leave blank for operator decision
+
     nextDown = '';
     nextDistance = '';
   }
@@ -332,7 +291,7 @@ const updateNextDownDistance = (
     next.dist = nextDistance;
   }
 };
-```
+
   // ================================
   // UPDATE CELL
   // ================================
