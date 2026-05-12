@@ -41,31 +41,36 @@ export default function LiveEntry() {
   const [data, setData] = useState<PlayEntry[]>(() => {
     const rows: PlayEntry[] = [];
 
-    for (let i = 1; i <= 200; i++) {
-      rows.push({
-        id: i,
-        playNumber: i,
-        odk: i % 3 === 0 ? 'D' : 'O',
-        down: '',
-        dist: '',
-        hash: '',
-        gnls: '',
-        yardLine: '',
-        playType: '',
-        result: '',
-        offFormation: '',
-        defense: '',
-        motion: '',
-        offPlay: '',
-        rpo: '',
-        playDir: '',
-        stunt: '',
-        blitz: '',
-        coverage: '',
-        manualOverride: false,
-      });
-    }
+  for (let i = 1; i <= 200; i++) {
+  rows.push({
+    id: i,
+    playNumber: i,
+    odk: i % 3 === 0 ? 'D' : 'O',
+    down: '',
+    dist: '',
+    hash: '',
+    gnls: '',
+    yardLine: '',
+    playType: '',
+    result: '',
+    offFormation: '',
+    defense: '',
+    motion: '',
+    offPlay: '',
+    rpo: '',
+    playDir: '',
+    stunt: '',
+    blitz: '',
+    coverage: '',
+    manualOverride: false,
+  });
+}
 
+// ONLY first row starts 1st & 10
+if (rows.length > 0) {
+  rows[0].down = 1;
+  rows[0].dist = 10;
+}
     return rows;
   });
 
