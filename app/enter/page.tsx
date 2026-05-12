@@ -326,16 +326,15 @@ export default function LiveEntry() {
     const inputRef =
       useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-      if (
-        isSelected &&
-        inputRef.current
-      ) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
-    }, [isSelected]);
-
+   useEffect(() => {
+  if (
+    isSelected &&
+    inputRef.current &&
+    document.activeElement !== inputRef.current
+  ) {
+    inputRef.current.focus();
+  }
+}, [isSelected]);
     return (
       <input
         ref={inputRef}
