@@ -214,77 +214,81 @@ const calculateGainLoss = (
 
   if (!next) return;
 
-  // Must have valid values first
+  // Must have complete values first
   if (
-    current.gnls === '' ||
     current.down === '' ||
-    current.dist === ''
+    current.dist === '' ||
+    current.gnls === ''
   ) {
     return;
   }
 
-  const gain = Number(current.gnls);
-  const dist = Number(current.dist);
   const down = Number(current.down);
+  const distance = Number(current.dist);
+  const gain = Number(current.gnls);
 
-  let newDown: number = 1;
-  let newDist: number = 10;
+  let nextDown: number | '' = '';
+  let nextDistance: number | '' = '';
 
   // =========================
   // FIRST DOWN
   // =========================
-  if (gain >= dist) {
+  if (gain >= distance) {
 
-    newDown = 1;
+    nextDown = 1;
 
-    // Goal-to-go handling
+    // Goal-to-go logic
     if (
       typeof next.yardLine === 'number' &&
       next.yardLine > 0 &&
       next.yardLine <= 10
     ) {
-      newDist = next.yardLine;
+      nextDistance = next.yardLine;
     } else {
-      newDist = 10;
+      nextDistance = 10;
     }
   }
 
   // =========================
-  // NORMAL DOWN PROGRESSION
+  // NORMAL PROGRESSION
+  // =========================
+  else if (down < 4) {
+
+    nextDown = down + 1;
+
+    nextDistance = Math.max(
+      1,
+      distance - gain
+    );
+  }
+
+  // =========================
+  // 4TH DOWN FAILED
   // =========================
   else {
 
-    // NEVER predict turnovers
-    // Stop at 4th down max
+    // DO NOT AUTO TURNOVER
+    // Leave blank for operator decision
 
-    newDown =
-      down >= 4 ? 4 : down + 1;
-
-    newDist = dist - gain;
-
-    // Clamp between 1-99
-    if (newDist < 1) {
-      newDist = 1;
-    }
-
-    if (newDist > 99) {
-      newDist = 99;
-    }
+    nextDown = '';
+    nextDistance = '';
   }
 
-  // ONLY fill blanks
+  // =========================
+  // ONLY FILL BLANKS
+  // =========================
   if (
     next.down === '' &&
     !next.manualOverride
   ) {
-    next.down = newDown;
+    next.down = nextDown;
   }
 
   if (
     next.dist === '' &&
     !next.manualOverride
   ) {
-    next.dist = newDist;
+    next.dist = nextDistance;
   }
 };
 
