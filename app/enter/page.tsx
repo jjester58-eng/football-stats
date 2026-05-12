@@ -191,19 +191,14 @@ const calculateGainLoss = (
     prevYard === null ||
     currentYard === '' ||
     currentYard === null
-  ) {
-    return '';
-  }
+  ) return '';
 
-  const prev =
-    normalizeFieldPosition(prevYard);
+  const prev = Number(prevYard);
+  const curr = Number(currentYard);
 
-  const current =
-    normalizeFieldPosition(currentYard);
-
-  return current - prev;
-};
-  // ================================
+  // direct difference already matches your system
+  return curr - prev;
+};  // ================================
   // AUTO DOWN / DISTANCE
   // ================================
   const updateNextDownDistance = (
@@ -241,7 +236,7 @@ const calculateGainLoss = (
   // =========================
   // FIRST DOWN
   // =========================
-  if (gain >= distance) {
+  if (Number(gain) >= Number(distance)){
 
     nextDown = 1;
 
