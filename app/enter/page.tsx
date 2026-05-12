@@ -205,61 +205,88 @@ const calculateGainLoss = (
   // AUTO DOWN / DISTANCE
   // ================================
   const updateNextDownDistance = (
-    plays: PlayEntry[],
-    index: number
-  ) => {
-    const current = plays[index];
-    const next = plays[index + 1];
+  plays: PlayEntry[],
+  index: number
+) => {
 
-    if (!next || current.gnls === '') return;
+  const current = plays[index];
+  const next = plays[index + 1];
 
-    const gain = Number(current.gnls);
-    const dist = Number(current.dist || 10);
+  if (!next) return;
 
-    let newDown: number | 'TO' = 1;
-    let newDist: number | '' = 10;
-
-    // First down
- if (gain >= dist) {
-
-  newDown = 1;
-
-  // Goal-to-go logic
+  // Must have valid values first
   if (
-    typeof next.yardLine === 'number' &&
-    next.yardLine > 0 &&
-    next.yardLine <= 10
+    current.gnls === '' ||
+    current.down === '' ||
+    current.dist === ''
   ) {
-    newDist = next.yardLine;
-  } else {
-    newDist = 10;
+    return;
   }
-}
 
-    // Normal progression
-    else if (
-      typeof current.down === 'number' &&
-      current.down < 4
+  const gain = Number(current.gnls);
+  const dist = Number(current.dist);
+  const down = Number(current.down);
+
+  let newDown: number = 1;
+  let newDist: number = 10;
+
+  // =========================
+  // FIRST DOWN
+  // =========================
+  if (gain >= dist) {
+
+    newDown = 1;
+
+    // Goal-to-go handling
+    if (
+      typeof next.yardLine === 'number' &&
+      next.yardLine > 0 &&
+      next.yardLine <= 10
     ) {
-      newDown = current.down + 1;
-      newDist = Math.max(1, dist - gain);
+      newDist = next.yardLine;
+    } else {
+      newDist = 10;
+    }
+  }
+
+  // =========================
+  // NORMAL DOWN PROGRESSION
+  // =========================
+  else {
+
+    // NEVER predict turnovers
+    // Stop at 4th down max
+
+    newDown =
+      down >= 4 ? 4 : down + 1;
+
+    newDist = dist - gain;
+
+    // Clamp between 1-99
+    if (newDist < 1) {
+      newDist = 1;
     }
 
-    // Turnover
-    else {
-      newDown = 'TO';
-      newDist = '';
+    if (newDist > 99) {
+      newDist = 99;
     }
+  }
 
-    // ONLY autofill blanks
-    if (next.down === '') {
-      next.down = newDown;
-    }
+  // ONLY fill blanks
+  if (
+    next.down === '' &&
+    !next.manualOverride
+  ) {
+    next.down = newDown;
+  }
 
-    if (next.dist === '') {
-      next.dist = newDist;
-    }
-  };
+  if (
+    next.dist === '' &&
+    !next.manualOverride
+  ) {
+    next.dist = newDist;
+  }
+};
 
   // ================================
   // UPDATE CELL
