@@ -307,12 +307,10 @@ const calculateGainLoss = (
 
     // Manual override protection
     if (
-      ['down', 'dist', 'gnls'].includes(
-        columnId
-      )
-    ) {
-      newData[rowIndex].manualOverride = true;
-    }
+  ['down', 'dist'].includes(columnId)
+) {
+  newData[rowIndex].manualOverride = true;
+}
 
     // Auto gain/loss from yard line
     if (
@@ -328,18 +326,16 @@ const calculateGainLoss = (
 
     // Auto next down/dist
     if (
-      ['gnls', 'down', 'dist'].includes(
-        columnId
-      ) &&
-      rowIndex < newData.length - 1 &&
-      !newData[rowIndex + 1]
-        .manualOverride
-    ) {
-      updateNextDownDistance(
-        newData,
-        rowIndex
-      );
-    }
+  ['gnls', 'down', 'dist'].includes(
+    columnId
+  ) &&
+  rowIndex < newData.length - 1
+) {
+  updateNextDownDistance(
+    newData,
+    rowIndex
+  );
+}
 
     setData(newData);
   };
