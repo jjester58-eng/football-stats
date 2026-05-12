@@ -232,6 +232,9 @@ const calculateGainLoss = (
   const distance = Number(current.dist);
   const gain = Number(current.gnls);
 
+  // Safety net — should never happen given guards above, but prevents NaN propagation
+  if (isNaN(down) || isNaN(distance) || isNaN(gain)) return;
+
   let nextDown: number | '' = '';
   let nextDistance: number | '' = '';
 
@@ -320,9 +323,11 @@ const updateRow = (
 
   const formattedValue =
     numericFields.includes(columnId)
-      ? newValue === ''
+      ? newValue === '' || newValue === null || newValue === undefined
         ? ''
-        : Number(newValue)
+        : isNaN(Number(newValue))
+          ? ''
+          : Number(newValue)
       : newValue;
 
   (newData[rowIndex] as any)[columnId] =
