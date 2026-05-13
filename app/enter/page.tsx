@@ -40,22 +40,14 @@ type PlayEntry = {
 const FIELD_MIN = -49;
 const FIELD_MAX = 49;
 
-function normalizeFieldPosition(
-  yardLine: number
-): number {
-
-  // Own side
+function normalizeFieldPosition(yardLine: number): number {
   if (yardLine < 0) {
-    return 50 - Math.abs(yardLine);
+    return 50 + yardLine; // -49 → 1, -1 → 49
   }
 
-  // Midfield
-  if (yardLine === 0) {
-    return 50;
-  }
+  if (yardLine === 0) return 50;
 
-  // Opponent side
-  return 50 + (50 - yardLine);
+  return 50 + yardLine; // 1 → 51, 49 → 99
 }
 function calcGainLoss(
   prevYardLine: NumericField,
