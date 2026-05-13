@@ -19,7 +19,7 @@ type PlayEntry = {
   dist: NumericField;
   hash: string;
   gnls: NumericField;
-  yardLine: NumericField;        // Just plain number (25, 47, 82, etc.)
+  yardLine: NumericField;
   playType: string;
   result: string;
   offFormation: string;
@@ -46,7 +46,7 @@ export default function LiveEntry() {
         dist: i === 1 ? 10 : '',
         hash: '',
         gnls: '',
-        yardLine: i === 1 ? 25 : '',     // Start at own 25
+        yardLine: i === 1 ? 25 : '',
         playType: '',
         result: '',
         offFormation: '',
@@ -89,7 +89,6 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // ================== SIMPLE MATH ==================
   const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
     if (prev === '' || current === '') return '';
     return Number(current) - Number(prev);
@@ -122,7 +121,6 @@ export default function LiveEntry() {
     const newData = [...data];
 
     let formattedValue: any = newValue;
-
     if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
       formattedValue = newValue === '' ? '' : Number(newValue);
     }
@@ -133,7 +131,6 @@ export default function LiveEntry() {
       newData[rowIndex].manualOverride = true;
     }
 
-    // Auto Gain/Loss on Yard Line entry
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
@@ -142,7 +139,6 @@ export default function LiveEntry() {
       updateNextDownDistance(newData, rowIndex - 1);
     }
 
-    // Auto Down & Distance
     if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
@@ -184,31 +180,37 @@ export default function LiveEntry() {
         onChange={(e) => updateRow(rowIndex, columnId, e.target.value)}
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
         onKeyDown={(e) => {
+          const input = inputRef.current;
           switch (e.key) {
             case 'Enter':
               e.preventDefault();
               moveToCell(rowIndex + 1, colIndex);
               break;
+
             case 'Tab':
               e.preventDefault();
               moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
               break;
+
             case 'ArrowDown':
               e.preventDefault();
               moveToCell(rowIndex + 1, colIndex);
               break;
+
             case 'ArrowUp':
               e.preventDefault();
               moveToCell(rowIndex - 1, colIndex);
               break;
+
             case 'ArrowRight':
-              if (inputRef.current?.selectionStart === inputRef.current.value.length) {
+              if (input && input.selectionStart === input.value.length) {
                 e.preventDefault();
                 moveToCell(rowIndex, colIndex + 1);
               }
               break;
+
             case 'ArrowLeft':
-              if (inputRef.current?.selectionStart === 0) {
+              if (input && input.selectionStart === 0) {
                 e.preventDefault();
                 moveToCell(rowIndex, colIndex - 1);
               }
@@ -262,7 +264,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Plain Numbers • Simple Math</p>
+              <p className="text-emerald-500">Plain Numbers • Arrow Navigation</p>
             </div>
           </div>
 
