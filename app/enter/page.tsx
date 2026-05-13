@@ -87,9 +87,21 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
+  // Your requested logic: -1 to -49 (own), 50 (mid), 49 to 1 (opp)
   const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
     if (prev === '' || current === '') return '';
-    return Number(current) - Number(prev);
+
+    let p = Number(prev);
+    let c = Number(current);
+
+    // Convert to consistent direction (higher = better for offense)
+    if (p < 0) p = 50 + p;           // -25 → 25
+    if (c < 0) c = 50 + c;           // -35 → 15
+
+    if (p > 50) p = 100 - p;         // Handle opponent side if needed
+    if (c > 50) c = 100 - c;
+
+    return c - p;   // Positive = gain
   };
 
   const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
@@ -256,7 +268,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Own side = Negative • Opponent side = Positive</p>
+              <p className="text-emerald-500">-49 to 49 • -25 to -35 = +10 gain</p>
             </div>
           </div>
 
