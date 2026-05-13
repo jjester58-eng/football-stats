@@ -77,7 +77,7 @@ function calcGainLoss(
       Number(newYardLine)
     );
 
-  return current - prev;
+return prev - current;
 }function projectYardLine(prevYardLine: NumericField, gnls: NumericField): NumericField {
   if (prevYardLine === '' || gnls === '') return '';
   const projected = Number(prevYardLine) + Number(gnls);
