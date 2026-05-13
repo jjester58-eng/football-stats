@@ -40,11 +40,19 @@ type PlayEntry = {
 const FIELD_MIN = -49;
 const FIELD_MAX = 49;
 
-function calcGainLoss(prevYardLine: NumericField, newYardLine: NumericField): NumericField {
-  if (prevYardLine === '' || newYardLine === '') return '';
-  return Number(newYardLine) - Number(prevYardLine);
-}
+function calcGainLoss(
+  prevYardLine: NumericField,
+  newYardLine: NumericField
+): NumericField {
 
+  if (
+    prevYardLine === '' ||
+    newYardLine === ''
+  ) return '';
+
+  // advancing toward opponent goal = positive
+  return Number(prevYardLine) - Number(newYardLine);
+}
 function projectYardLine(prevYardLine: NumericField, gnls: NumericField): NumericField {
   if (prevYardLine === '' || gnls === '') return '';
   const projected = Number(prevYardLine) + Number(gnls);
