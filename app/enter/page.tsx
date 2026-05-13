@@ -121,10 +121,21 @@ export default function LiveEntry() {
     const newData = [...data];
 
     let formattedValue: any = newValue;
-    if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
-      formattedValue = newValue === '' ? '' : Number(newValue);
-    }
 
+if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
+
+  // allow temporary negative typing
+  if (newValue === '' || newValue === '-') {
+    formattedValue = '';
+  } else {
+
+    const parsed = Number(newValue);
+
+    formattedValue = Number.isNaN(parsed)
+      ? ''
+      : parsed;
+  }
+}
     (newData[rowIndex] as any)[columnId] = formattedValue;
 
     if (columnId === 'yardLine' && rowIndex > 0) {
@@ -171,7 +182,7 @@ export default function LiveEntry() {
     return (
       <input
         ref={inputRef}
-        value={value ?? ''}
+        value={value === '' ? '' : value}
         onChange={(e) => updateRow(rowIndex, columnId, e.target.value)}
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
         onKeyDown={(e) => {
