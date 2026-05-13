@@ -31,7 +31,6 @@ type PlayEntry = {
   stunt: string;
   blitz: string;
   coverage: string;
-  manualOverride?: boolean;
 };
 
 export default function LiveEntry() {
@@ -46,7 +45,7 @@ export default function LiveEntry() {
         dist: i === 1 ? 10 : '',
         hash: '',
         gnls: '',
-        yardLine: i === 1 ? 25 : '',
+        yardLine: i === 1 ? -25 : '',     // Negative = Own side
         playType: '',
         result: '',
         offFormation: '',
@@ -58,7 +57,6 @@ export default function LiveEntry() {
         stunt: '',
         blitz: '',
         coverage: '',
-        manualOverride: false,
       });
     }
     return rows;
@@ -105,6 +103,8 @@ export default function LiveEntry() {
     const dist = Number(current.dist);
     const down = Number(current.down);
 
+    if (isNaN(gain) || isNaN(dist) || isNaN(down)) return;
+
     if (gain >= dist) {
       next.down = 1;
       next.dist = 10;
@@ -127,16 +127,11 @@ export default function LiveEntry() {
 
     (newData[rowIndex] as any)[columnId] = formattedValue;
 
-    if (['down', 'dist'].includes(columnId)) {
-      newData[rowIndex].manualOverride = true;
-    }
-
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
         formattedValue
       );
-      updateNextDownDistance(newData, rowIndex - 1);
     }
 
     if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
@@ -180,37 +175,31 @@ export default function LiveEntry() {
         onChange={(e) => updateRow(rowIndex, columnId, e.target.value)}
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
         onKeyDown={(e) => {
-          const input = inputRef.current;
           switch (e.key) {
             case 'Enter':
               e.preventDefault();
               moveToCell(rowIndex + 1, colIndex);
               break;
-
             case 'Tab':
               e.preventDefault();
               moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
               break;
-
             case 'ArrowDown':
               e.preventDefault();
               moveToCell(rowIndex + 1, colIndex);
               break;
-
             case 'ArrowUp':
               e.preventDefault();
               moveToCell(rowIndex - 1, colIndex);
               break;
-
             case 'ArrowRight':
-              if (input && input.selectionStart === input.value.length) {
+              if (inputRef.current && inputRef.current.selectionStart === inputRef.current.value.length) {
                 e.preventDefault();
                 moveToCell(rowIndex, colIndex + 1);
               }
               break;
-
             case 'ArrowLeft':
-              if (input && input.selectionStart === 0) {
+              if (inputRef.current && inputRef.current.selectionStart === 0) {
                 e.preventDefault();
                 moveToCell(rowIndex, colIndex - 1);
               }
@@ -218,9 +207,7 @@ export default function LiveEntry() {
           }
         }}
         className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
-          isSelected
-            ? 'border-blue-500 bg-zinc-800'
-            : 'border-transparent hover:border-zinc-700'
+          isSelected ? 'border-blue-500 bg-zinc-800' : 'border-transparent hover:border-zinc-700'
         }`}
       />
     );
@@ -249,7 +236,6 @@ export default function LiveEntry() {
       stunt: '',
       blitz: '',
       coverage: '',
-      manualOverride: false,
     };
     setData([...data, newPlay]);
   };
@@ -264,7 +250,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Plain Numbers • Arrow Navigation</p>
+              <p className="text-emerald-500">Stable • Plain Numbers</p>
             </div>
           </div>
 
