@@ -45,7 +45,7 @@ export default function LiveEntry() {
         dist: i === 1 ? 10 : '',
         hash: '',
         gnls: '',
-        yardLine: i === 1 ? -25 : '',     // Negative = Own side
+        yardLine: i === 1 ? -25 : '',
         playType: '',
         result: '',
         offFormation: '',
@@ -121,21 +121,10 @@ export default function LiveEntry() {
     const newData = [...data];
 
     let formattedValue: any = newValue;
+    if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
+      formattedValue = newValue === '' ? '' : Number(newValue);
+    }
 
-if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
-
-  // allow temporary negative typing
-  if (newValue === '' || newValue === '-') {
-    formattedValue = '';
-  } else {
-
-    const parsed = Number(newValue);
-
-    formattedValue = Number.isNaN(parsed)
-      ? ''
-      : parsed;
-  }
-}
     (newData[rowIndex] as any)[columnId] = formattedValue;
 
     if (columnId === 'yardLine' && rowIndex > 0) {
@@ -182,10 +171,11 @@ if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
     return (
       <input
         ref={inputRef}
-        value={value === '' ? '' : value}
+        value={value ?? ''}
         onChange={(e) => updateRow(rowIndex, columnId, e.target.value)}
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
         onKeyDown={(e) => {
+          const input = inputRef.current;
           switch (e.key) {
             case 'Enter':
               e.preventDefault();
@@ -204,13 +194,13 @@ if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
               moveToCell(rowIndex - 1, colIndex);
               break;
             case 'ArrowRight':
-              if (inputRef.current && inputRef.current.selectionStart === inputRef.current.value.length) {
+              if (input && input.selectionStart === input.value.length) {
                 e.preventDefault();
                 moveToCell(rowIndex, colIndex + 1);
               }
               break;
             case 'ArrowLeft':
-              if (inputRef.current && inputRef.current.selectionStart === 0) {
+              if (input && input.selectionStart === 0) {
                 e.preventDefault();
                 moveToCell(rowIndex, colIndex - 1);
               }
@@ -261,7 +251,7 @@ if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Stable • Plain Numbers</p>
+              <p className="text-emerald-500">Fixed Navigation • Own Side = Negative</p>
             </div>
           </div>
 
