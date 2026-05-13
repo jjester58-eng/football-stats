@@ -253,16 +253,25 @@ export default function LiveEntry() {
 
   const updateRow = useCallback((rowIndex: number, columnId: string, rawValue: any) => {
     setData((prev) => {
-      const next = prev.map((r) => ({ ...r })); // shallow-clone all rows
+      const next = prev.map((r) => ({ ...r }));
       const numericCols = ['down', 'dist', 'gnls', 'yardLine'];
-      const formatted: any = numericCols.includes(columnId)
-        ? rawValue === '' ? '' : Number(rawValue)
-        : rawValue;
+
+      let formatted: any = rawValue;
+      if (numericCols.includes(columnId)) {
+        if (rawValue === '' || rawValue === '-') {
+          formatted = rawValue; // still typing, store as-is
+        } else {
+          const parsed = Number(rawValue);
+          formatted = isNaN(parsed) ? (next[rowIndex] as any)[columnId] : parsed;
+        }
+      }
+
+      const isComplete = formatted !== '' && formatted !== '-' && !isNaN(Number(formatted));
 
       (next[rowIndex] as any)[columnId] = formatted;
 
-      // ── Bidirectional yard line ↔ gain/loss autofill ──────────────────────
-      if (columnId === 'yardLine' && rowIndex > 0) {
+      // ── Autofill only when we have a complete number ─────────────────────
+      if (isComplete && columnId === 'yardLine' && rowIndex > 0) {
         // User typed a new yard line → compute gain/loss from previous play's yard line
         const prevYL = next[rowIndex - 1].yardLine;
         next[rowIndex].gnls = calcGainLoss(prevYL, formatted);
@@ -272,7 +281,7 @@ export default function LiveEntry() {
         }
       }
 
-      if (columnId === 'gnls' && rowIndex > 0) {
+      if (isComplete && columnId === 'gnls' && rowIndex > 0) {
         // User typed a gain/loss → project forward yard line
         const prevYL = next[rowIndex - 1].yardLine;
         if (prevYL !== '') {
@@ -280,8 +289,7 @@ export default function LiveEntry() {
         }
       }
 
-      // ── Auto-fill next row's down & distance ─────────────────────────────
-      if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < next.length - 1) {
+      if (isComplete && ['gnls', 'down', 'dist'].includes(columnId) && rowIndex < next.length - 1) {
         const { down: nextDown, dist: nextDist } = computeNextDownDist(
           next[rowIndex].down,
           next[rowIndex].dist,
@@ -289,14 +297,6 @@ export default function LiveEntry() {
         );
         next[rowIndex + 1].down = nextDown;
         next[rowIndex + 1].dist = nextDist;
-      }
-
-      // ── Auto-carry yard line to next row when it's empty ─────────────────
-      // (So the next play auto-inherits position after gnls is resolved)
-      if (columnId === 'gnls' && rowIndex + 1 < next.length) {
-        if (next[rowIndex + 1].yardLine === '') {
-          // Leave blank; user should enter or it will fill when this row's yardLine resolves
-        }
       }
 
       return next;
