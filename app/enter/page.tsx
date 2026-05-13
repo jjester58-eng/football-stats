@@ -40,6 +40,19 @@ type PlayEntry = {
 const FIELD_MIN = -49;
 const FIELD_MAX = 49;
 
+function normalizeFieldPosition(
+  yardLine: number
+): number {
+
+  // Own side
+  if (yardLine < 0) {
+    return 50 + yardLine;
+  }
+
+  // Opponent side
+  return 50 + yardLine;
+}
+
 function calcGainLoss(
   prevYardLine: NumericField,
   newYardLine: NumericField
@@ -50,10 +63,18 @@ function calcGainLoss(
     newYardLine === ''
   ) return '';
 
-  // advancing toward opponent goal = positive
-  return Number(prevYardLine) - Number(newYardLine);
-}
-function projectYardLine(prevYardLine: NumericField, gnls: NumericField): NumericField {
+  const prev =
+    normalizeFieldPosition(
+      Number(prevYardLine)
+    );
+
+  const current =
+    normalizeFieldPosition(
+      Number(newYardLine)
+    );
+
+  return current - prev;
+}function projectYardLine(prevYardLine: NumericField, gnls: NumericField): NumericField {
   if (prevYardLine === '' || gnls === '') return '';
   const projected = Number(prevYardLine) + Number(gnls);
   return Math.max(FIELD_MIN, Math.min(FIELD_MAX, projected));
