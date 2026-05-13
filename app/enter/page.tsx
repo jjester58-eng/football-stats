@@ -46,13 +46,17 @@ function normalizeFieldPosition(
 
   // Own side
   if (yardLine < 0) {
-    return 50 + yardLine;
+    return 50 - Math.abs(yardLine);
+  }
+
+  // Midfield
+  if (yardLine === 0) {
+    return 50;
   }
 
   // Opponent side
-  return 50 + yardLine;
+  return 50 + (50 - yardLine);
 }
-
 function calcGainLoss(
   prevYardLine: NumericField,
   newYardLine: NumericField
