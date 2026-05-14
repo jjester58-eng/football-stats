@@ -257,7 +257,31 @@ export default function LiveEntry() {
     setData([...data, newPlay]);
   };
 
-  // Download CSV
+  const startNewGame = () => {
+    if (!confirm('Start a new game? Current data will be lost.')) return;
+    setOpponent('');
+    setGameDate(new Date().toISOString().split('T')[0]);
+    
+    setData(prev => prev.map((row, i) => ({
+      ...row,
+      down: i === 0 ? 1 : '',
+      dist: i === 0 ? 10 : '',
+      gnls: '',
+      yardLine: i === 0 ? -25 : '',
+      playType: '',
+      result: '',
+      offFormation: '',
+      defense: '',
+      motion: '',
+      offPlay: '',
+      rpo: '',
+      playDir: '',
+      stunt: '',
+      blitz: '',
+      coverage: '',
+    })));
+  };
+
   const downloadCSV = () => {
     const headers = columns.map(col => col.header as string);
     
@@ -280,77 +304,53 @@ export default function LiveEntry() {
     URL.revokeObjectURL(url);
   };
 
-  const startNewGame = () => {
-    if (!confirm('Start a new game? Current data will be lost.')) return;
-    
-    setOpponent('');
-    setData(prev => prev.map((row, i) => ({
-      ...row,
-      down: i === 0 ? 1 : '',
-      dist: i === 0 ? 10 : '',
-      gnls: '',
-      yardLine: i === 0 ? -25 : '',
-      playType: '',
-      result: '',
-      offFormation: '',
-      defense: '',
-      motion: '',
-      offPlay: '',
-      rpo: '',
-      playDir: '',
-      stunt: '',
-      blitz: '',
-      coverage: '',
-    })));
-  };
-
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
       <div className="max-w-[95%] mx-auto">
-        {/* Game Header */}
-        <div className="flex flex-wrap gap-4 items-center justify-between mb-6 bg-zinc-900 border border-zinc-700 rounded-2xl p-4">
-          <div className="flex items-center gap-4">
-            <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
-              <ArrowLeft size={22} /> Back
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold">Live Entry</h1>
-              <p className="text-emerald-500 text-sm">Kangaroos Football</p>
+        {/* Header */}
+        <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 mb-6">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
+                <ArrowLeft size={22} /> Back
+              </button>
+              <h1 className="text-4xl font-bold">Live Entry</h1>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              type="text"
-              placeholder="Opponent Name"
-              value={opponent}
-              onChange={(e) => setOpponent(e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 w-64 focus:outline-none focus:border-blue-500"
-            />
-            <input
-              type="date"
-              value={gameDate}
-              onChange={(e) => setGameDate(e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500"
-            />
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={startNewGame}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-xl font-medium"
+              >
+                <Play size={18} /> New Game
+              </button>
 
-            <button
-              onClick={startNewGame}
-              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-xl"
-            >
-              <Play size={18} /> New Game
-            </button>
+              <input
+                type="text"
+                placeholder="Opponent Name"
+                value={opponent}
+                onChange={(e) => setOpponent(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 w-64 focus:outline-none focus:border-blue-500"
+              />
 
-            <button
-              onClick={downloadCSV}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-xl font-medium"
-            >
-              <Download size={18} /> Download CSV
-            </button>
+              <input
+                type="date"
+                value={gameDate}
+                onChange={(e) => setGameDate(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
+              />
 
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-xl font-semibold">
-              <Save size={18} /> Save Game
-            </button>
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl"
+              >
+                <Download size={18} /> Download CSV
+              </button>
+
+              <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-semibold">
+                <Save size={18} /> Save Game
+              </button>
+            </div>
           </div>
         </div>
 
