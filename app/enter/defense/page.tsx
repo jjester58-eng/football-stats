@@ -178,7 +178,7 @@ export default function DefenseEntry() {
               className="bg-zinc-800 border border-zinc-700 rounded-xl px-5 py-3 w-72"
             />
             <button className="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-semibold">
-              Save Deffense Data
+              Save Defense Data
             </button>
           </div>
         </div>
