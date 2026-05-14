@@ -87,21 +87,18 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // Your requested logic: -1 to -49 (own), 50 (mid), 49 to 1 (opp)
+  // Convert displayed yard line to absolute position (0 = own goal, 100 = opp goal)
+  const toAbsolute = (val: NumericField): number => {
+    if (val === '') return 50;
+    const n = Number(val);
+    if (n < 0) return 50 + n;           // -25 → 25
+    if (n === 50) return 50;
+    return 50 + (50 - n);               // 35 → 65, 25 → 75, etc.
+  };
+
   const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
     if (prev === '' || current === '') return '';
-
-    let p = Number(prev);
-    let c = Number(current);
-
-    // Convert to consistent direction (higher = better for offense)
-    if (p < 0) p = 50 + p;           // -25 → 25
-    if (c < 0) c = 50 + c;           // -35 → 15
-
-    if (p > 50) p = 100 - p;         // Handle opponent side if needed
-    if (c > 50) c = 100 - c;
-
-    return c - p;   // Positive = gain
+    return toAbsolute(current) - toAbsolute(prev);
   };
 
   const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
@@ -268,7 +265,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">-49 to 49 • -25 to -35 = +10 gain</p>
+              <p className="text-emerald-500">-49 to 49 system • -25 to -35 = +10 gain</p>
             </div>
           </div>
 
