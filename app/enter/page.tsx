@@ -270,8 +270,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Yard Line Working • Down & Distance Fixed</p>
-            </div>
+              </div>
           </div>
 
           <div className="flex gap-3">
