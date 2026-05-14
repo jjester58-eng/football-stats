@@ -78,13 +78,13 @@ export default function LiveEntry() {
     columnHelper.accessor('gnls', { header: 'GN/LS' }),
     columnHelper.accessor('yardLine', { header: 'YARD LN' }),
     columnHelper.accessor('playType', { header: 'PLAY TYPE' }),
-    columnHelper.accessor('result', { header: 'RESULT' }),
+    columnHelper.accessor('result', { header: 'Result' }),
     columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
-    columnHelper.accessor('defense', { header: 'DEFENSE' }),
-    columnHelper.accessor('motion', { header: 'MOTION' }),
+    columnHelper.accessor('defense', { header: 'Defense' }),
+    columnHelper.accessor('motion', { header: 'Motion' }),
     columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
     columnHelper.accessor('rpo', { header: 'RPO' }),
-    columnHelper.accessor('playDir', { header: 'DIR' }),
+    columnHelper.accessor('playDir', { header: 'PLAY DIR' }),
     columnHelper.accessor('stunt', { header: 'STUNT' }),
     columnHelper.accessor('blitz', { header: 'BLITZ' }),
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
@@ -148,11 +148,9 @@ export default function LiveEntry() {
         newData[rowIndex - 1].yardLine,
         formatted
       );
-      // After calculating gain/loss, update the current row's down/distance
-      updateNextDownDistance(newData, rowIndex - 1);
     }
 
-    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+    if (['yardLine', 'gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
 
@@ -316,10 +314,11 @@ export default function LiveEntry() {
               <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
                 <ArrowLeft size={22} /> Back
               </button>
-              <h1 className="text-4xl font-bold">Live Entry</h1>
+              <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
+              {/* New Game */}
               <button
                 onClick={startNewGame}
                 className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-xl font-medium"
@@ -327,12 +326,33 @@ export default function LiveEntry() {
                 <Play size={18} /> New Game
               </button>
 
+              {/* Navigation Buttons */}
+              <div className="flex items-center gap-1 bg-zinc-800 rounded-xl p-1">
+                <button
+                  onClick={() => window.location.href = '/enter'}
+                  className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+                >
+                  ODK
+                </button>
+                <button
+                  onClick={() => window.location.href = '/enter/offense'}
+                  className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+                >
+                  OFFENSE
+                </button>
+                <button
+                  onClick={() => window.location.href = '/enter/defense'}
+                  className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+                >
+                  DEFENSE
+                </button>
+              </div>
+
               <input
                 type="text"
                 placeholder="Opponent Name"
                 value={opponent}
                 onChange={(e) => setOpponent(e.target.value)}
-                onFocus={() => setSelectedCell({ row: -1, col: -1 })}
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 w-64 focus:outline-none focus:border-blue-500"
               />
 
@@ -340,7 +360,6 @@ export default function LiveEntry() {
                 type="date"
                 value={gameDate}
                 onChange={(e) => setGameDate(e.target.value)}
-                onFocus={() => setSelectedCell({ row: -1, col: -1 })}
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
               />
 
@@ -348,7 +367,7 @@ export default function LiveEntry() {
                 onClick={downloadCSV}
                 className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl"
               >
-                <Download size={18} /> Download CSV
+                <Download size={18} /> CSV
               </button>
 
               <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-semibold">
