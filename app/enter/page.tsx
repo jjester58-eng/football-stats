@@ -319,20 +319,20 @@ export default function LiveEntry() {
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <button onClick={startNewGame} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-xl font-medium">
-                <Play size={18} /> New Game
-              </button>
+           <div className="flex items-center gap-3 flex-wrap">
+  <button onClick={startNewGame} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-xl font-medium">
+    <Play size={18} /> New Game
+  </button>
 
-              <button onClick={() => window.location.href = '/enter'} className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium">
-                ODK
-              </button>
-              <button onClick={() => window.location.href = '/enter/offense'} className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium">
-                OFFENSE
-              </button>
-              <button onClick={() => window.location.href = '/enter/defense'} className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium">
-                DEFENSE
-              </button>
+  <button onClick={() => window.location.href = '/enter'} className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium">
+    ODK
+  </button>
+  <button onClick={() => window.location.href = '/enter/offense'} className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium">
+    OFFENSE
+  </button>
+  <button onClick={() => window.location.href = '/enter/defense'} className="px-5 py-2.5 hover:bg-zinc-700 rounded-xl text-sm font-medium">
+    DEFENSE
+  </button>
 
               <input
                 type="text"
