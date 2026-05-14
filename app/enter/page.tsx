@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Play, Download, Save, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowLeft, Play, Download, Loader2, CheckCircle } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -41,6 +41,7 @@ export default function LiveEntry() {
 
   const [isStartingNewGame, setIsStartingNewGame] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
 
@@ -71,6 +72,8 @@ export default function LiveEntry() {
     return rows;
   });
 
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const columnHelper = createColumnHelper<PlayEntry>();
 
   const columns = [
@@ -93,6 +96,59 @@ export default function LiveEntry() {
     columnHelper.accessor('blitz', { header: 'BLITZ' }),
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
+
+  // Auto Save Function
+  const autoSave = useCallback(async () => {
+    if (!currentGameId) return;
+
+    setIsSaving(true);
+    try {
+      const playsToSave = data.map((play) => ({
+        game_id: currentGameId,
+        play_number: play.playNumber,
+        odk: play.odk,
+        down: play.down,
+        dist: play.dist,
+        hash: play.hash,
+        gnls: play.gnls,
+        yard_line: play.yardLine,
+        play_type: play.playType,
+        result: play.result,
+        off_formation: play.offFormation,
+        defense: play.defense,
+        motion: play.motion,
+        off_play: play.offPlay,
+        rpo: play.rpo,
+        play_dir: play.playDir,
+        stunt: play.stunt,
+        blitz: play.blitz,
+        coverage: play.coverage,
+      }));
+
+      const { error } = await supabase
+        .from('plays')
+        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
+
+      if (error) throw error;
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentGameId, data]);
+
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(autoSave, 2000);
+  }, [autoSave]);
+
+  useEffect(() => {
+    if (currentGameId) triggerAutoSave();
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [data, currentGameId, triggerAutoSave]);
 
   // Helper Functions
   const toPosition = (val: NumericField): number => {
@@ -166,7 +222,6 @@ export default function LiveEntry() {
     });
   };
 
-  // Editable Cell - Fixed null safety
   function EditableCell({
     value,
     rowIndex,
@@ -276,46 +331,6 @@ export default function LiveEntry() {
     }
   };
 
-  const saveGame = async () => {
-    if (!currentGameId) return alert("Please start a new game first");
-
-    setIsSaving(true);
-    try {
-      const playsToSave = data.map((play) => ({
-        game_id: currentGameId,
-        play_number: play.playNumber,
-        odk: play.odk,
-        down: play.down,
-        dist: play.dist,
-        hash: play.hash,
-        gnls: play.gnls,
-        yard_line: play.yardLine,
-        play_type: play.playType,
-        result: play.result,
-        off_formation: play.offFormation,
-        defense: play.defense,
-        motion: play.motion,
-        off_play: play.offPlay,
-        rpo: play.rpo,
-        play_dir: play.playDir,
-        stunt: play.stunt,
-        blitz: play.blitz,
-        coverage: play.coverage,
-      }));
-
-      const { error } = await supabase
-        .from('plays')
-        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
-
-      if (error) throw error;
-      alert("Game saved successfully!");
-    } catch (error: any) {
-      alert(error.message || "Failed to save game");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const downloadCSV = () => {
     const headers = columns.map(col => col.header as string);
     const csvContent = [
@@ -388,14 +403,13 @@ export default function LiveEntry() {
                 <Download size={18} /> CSV
               </button>
 
-              <button
-                onClick={saveGame}
-                disabled={isSaving || !currentGameId}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 px-6 py-2.5 rounded-xl font-semibold transition"
-              >
-                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {isSaving ? 'Saving...' : 'Save Game'}
-              </button>
+              <div className="text-sm flex items-center gap-2 text-zinc-400">
+                {isSaving ? (
+                  <span className="flex items-center gap-1"><Loader2 size={16} className="animate-spin" /> Saving...</span>
+                ) : lastSaved ? (
+                  <span className="flex items-center gap-1 text-emerald-500"><CheckCircle size={16} /> Auto-saved</span>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
