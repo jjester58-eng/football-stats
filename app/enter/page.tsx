@@ -87,22 +87,12 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // Your exact conversion: -48 = 48, 47 = 53, etc.
-  const toPosition = (val: NumericField): number => {
-    if (val === '') return 50;
-    const n = Number(val);
-    if (n < 0) return -n;                    // -48 → 48
-    if (n === 50) return 50;
-    return 50 + (50 - n);                    // 47 → 53, 40 → 60, 25 → 75
-  };
-
   const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
     if (prev === '' || current === '') return '';
-    const p = toPosition(prev);
-    const c = toPosition(current);
-    return c - p;   // Should be positive when advancing
+    return Number(current) - Number(prev);
   };
 
+  // Improved Down & Distance Logic
   const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
     const current = plays[index];
     const next = plays[index + 1];
@@ -117,12 +107,15 @@ export default function LiveEntry() {
     if (isNaN(gain) || isNaN(dist) || isNaN(down)) return;
 
     if (gain >= dist) {
+      // First Down
       next.down = 1;
       next.dist = 10;
     } else if (down < 4) {
+      // Normal progression
       next.down = down + 1;
       next.dist = Math.max(1, dist - gain);
     } else {
+      // 4th down failure
       next.down = '';
       next.dist = '';
     }
@@ -143,7 +136,7 @@ export default function LiveEntry() {
 
     (newData[rowIndex] as any)[columnId] = formatted;
 
-    // Auto Gain/Loss when Yard Line changes
+    // Auto Gain/Loss
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
@@ -269,7 +262,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">-48 = 48 • 47 = 53 • Gain should be positive</p>
+              <p className="text-emerald-500">-25 to -35 = +10 gain • Auto Down/Distance</p>
             </div>
           </div>
 
