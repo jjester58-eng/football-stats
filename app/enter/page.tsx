@@ -105,14 +105,14 @@ export default function LiveEntry() {
     const next = plays[index + 1];
     if (!next) return;
 
-    // Only run if we have enough info
-    if (current.gnls === '' || current.dist === '' || current.down === '') return;
+    // Require gain and current down/dist to calculate
+    if (current.gnls === '' || current.down === '' || current.dist === '') return;
 
     const gain = Number(current.gnls);
-    const dist = Number(current.dist);
     const down = Number(current.down);
+    const dist = Number(current.dist);
 
-    if (isNaN(gain) || isNaN(dist) || isNaN(down)) return;
+    if (isNaN(gain) || isNaN(down) || isNaN(dist)) return;
 
     if (gain >= dist) {
       next.down = 1;
@@ -149,7 +149,7 @@ export default function LiveEntry() {
       );
     }
 
-    // Auto Down & Distance — trigger more reliably
+    // Trigger Down/Distance update more aggressively
     if (['yardLine', 'gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
@@ -267,7 +267,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Yard Line + Auto Down/Distance</p>
+              <p className="text-emerald-500">Yard Line Working • Trying to fix D&D</p>
             </div>
           </div>
 
