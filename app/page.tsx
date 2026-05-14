@@ -1,152 +1,425 @@
 'use client';
+import { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Play, Download, Save } from 'lucide-react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  createColumnHelper,
+  flexRender,
+} from '@tanstack/react-table';
+import { supabase } from '@/lib/supabase';
 
-import { Play, Upload, BarChart3, ArrowRight } from 'lucide-react';
+type NumericField = number | '';
+type PlayEntry = {
+  id?: string;
+  playNumber: number;
+  odk: string;
+  down: NumericField;
+  dist: NumericField;
+  hash: string;
+  gnls: NumericField;
+  yardLine: NumericField;
+  playType: string;
+  result: string;
+  offFormation: string;
+  defense: string;
+  motion: string;
+  offPlay: string;
+  rpo: string;
+  playDir: string;
+  stunt: string;
+  blitz: string;
+  coverage: string;
+};
 
-export default function KangaroosLanding() {
+export default function LiveEntry() {
+  const [opponent, setOpponent] = useState('');
+  const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
+  const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+  const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
+
+  const [data, setData] = useState<PlayEntry[]>(() => {
+    const rows: PlayEntry[] = [];
+    for (let i = 1; i <= 200; i++) {
+      rows.push({
+        playNumber: i,
+        odk: i % 2 === 0 ? 'D' : 'O',
+        down: i === 1 ? 1 : '',
+        dist: i === 1 ? 10 : '',
+        hash: '',
+        gnls: '',
+        yardLine: i === 1 ? -25 : '',
+        playType: '',
+        result: '',
+        offFormation: '',
+        defense: '',
+        motion: '',
+        offPlay: '',
+        rpo: '',
+        playDir: '',
+        stunt: '',
+        blitz: '',
+        coverage: '',
+      });
+    }
+    return rows;
+  });
+
+  const columnHelper = createColumnHelper<PlayEntry>();
+
+  const columns = [
+    columnHelper.accessor('playNumber', { header: 'PLAY #' }),
+    columnHelper.accessor('odk', { header: 'ODK' }),
+    columnHelper.accessor('down', { header: 'DN' }),
+    columnHelper.accessor('dist', { header: 'DIST' }),
+    columnHelper.accessor('hash', { header: 'HASH' }),
+    columnHelper.accessor('gnls', { header: 'GN/LS' }),
+    columnHelper.accessor('yardLine', { header: 'YARD LN' }),
+    columnHelper.accessor('playType', { header: 'PLAY TYPE' }),
+    columnHelper.accessor('result', { header: 'Result' }),
+    columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
+    columnHelper.accessor('defense', { header: 'Defense' }),
+    columnHelper.accessor('motion', { header: 'Motion' }),
+    columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
+    columnHelper.accessor('rpo', { header: 'RPO' }),
+    columnHelper.accessor('playDir', { header: 'PLAY DIR' }),
+    columnHelper.accessor('stunt', { header: 'STUNT' }),
+    columnHelper.accessor('blitz', { header: 'BLITZ' }),
+    columnHelper.accessor('coverage', { header: 'COVERAGE' }),
+  ];
+
+  // Helper Functions
+  const toPosition = (val: NumericField): number => {
+    if (val === '' || val === null) return 50;
+    const n = Number(val);
+    if (isNaN(n)) return 50;
+    if (n < 0) return -n;
+    if (n === 50) return 50;
+    return 50 + (50 - n);
+  };
+
+  const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
+    if (prev === '' || current === '') return '';
+    return toPosition(current) - toPosition(prev);
+  };
+
+  const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
+    const current = plays[index];
+    const next = plays[index + 1];
+    if (!next) return;
+    if (current.gnls === '' || current.dist === '' || current.down === '') return;
+
+    const gain = Number(current.gnls);
+    const dist = Number(current.dist);
+    const down = Number(current.down);
+
+    if (isNaN(gain) || isNaN(dist) || isNaN(down)) return;
+
+    if (gain >= dist) {
+      next.down = 1;
+      next.dist = 10;
+    } else if (down < 4) {
+      next.down = down + 1;
+      next.dist = Math.max(1, dist - gain);
+    } else {
+      next.down = '';
+      next.dist = '';
+    }
+  };
+
+  const updateRow = (rowIndex: number, columnId: string, rawValue: any) => {
+    const newData = [...data];
+    let formatted: any = rawValue;
+
+    if (['down', 'dist', 'gnls', 'yardLine'].includes(columnId)) {
+      if (rawValue === '' || rawValue === '-') {
+        formatted = rawValue;
+      } else {
+        const num = Number(rawValue);
+        formatted = isNaN(num) ? '' : num;
+      }
+    }
+
+    (newData[rowIndex] as any)[columnId] = formatted;
+
+    // Auto calculate Gain/Loss when Yard Line changes
+    if (columnId === 'yardLine' && rowIndex > 0) {
+      newData[rowIndex - 1].gnls = calculateGainLoss(
+        newData[rowIndex - 1].yardLine,
+        formatted
+      );
+      updateNextDownDistance(newData, rowIndex - 1);
+    }
+
+    // Update next down/dist when GN/LS, Down, or Dist changes
+    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+      updateNextDownDistance(newData, rowIndex);
+    }
+
+    setData(newData);
+  };
+
+  const moveToCell = (row: number, col: number) => {
+    setSelectedCell({
+      row: Math.max(0, Math.min(row, data.length - 1)),
+      col: Math.max(0, Math.min(col, columns.length - 1)),
+    });
+  };
+
+  // Editable Cell Component
+  function EditableCell({
+    value,
+    rowIndex,
+    columnId,
+    colIndex,
+  }: {
+    value: any;
+    rowIndex: number;
+    columnId: string;
+    colIndex: number;
+  }) {
+    const isSelected = selectedCell.row === rowIndex && selectedCell.col === colIndex;
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (isSelected && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, [isSelected]);
+
+    return (
+      <input
+        ref={inputRef}
+        value={value ?? ''}
+        onChange={(e) => updateRow(rowIndex, columnId, e.target.value)}
+        onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+        onKeyDown={(e) => {
+          switch (e.key) {
+            case 'Enter':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'Tab':
+              e.preventDefault();
+              moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'ArrowUp':
+              e.preventDefault();
+              moveToCell(rowIndex - 1, colIndex);
+              break;
+            case 'ArrowRight':
+              if (inputRef.current && inputRef.current.selectionStart === inputRef.current.value.length) {
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex + 1);
+              }
+              break;
+            case 'ArrowLeft':
+              if (inputRef.current && inputRef.current.selectionStart === 0) {
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex - 1);
+              }
+              break;
+          }
+        }}
+        className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
+          isSelected ? 'border-blue-500 bg-zinc-800' : 'border-transparent hover:border-zinc-700'
+        }`}
+      />
+    );
+  }
+
+  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
+
+  // Start New Game (with Supabase)
+  const startNewGame = async () => {
+    if (!opponent.trim()) {
+      alert("Please enter an opponent name first.");
+      return;
+    }
+    if (!confirm('Start a new game? Current data will be lost.')) return;
+
+    const { data: game, error } = await supabase
+      .from('games')
+      .insert({
+        opponent: opponent.trim(),
+        game_date: gameDate,
+        status: 'live'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error(error);
+      alert("Failed to create new game");
+      return;
+    }
+
+    setCurrentGameId(game.id);
+
+    // Reset data
+    setData(prev => prev.map((row, i) => ({
+      ...row,
+      down: i === 0 ? 1 : '',
+      dist: i === 0 ? 10 : '',
+      gnls: '',
+      yardLine: i === 0 ? -25 : '',
+      playType: '',
+      result: '',
+      offFormation: '',
+      defense: '',
+      motion: '',
+      offPlay: '',
+      rpo: '',
+      playDir: '',
+      stunt: '',
+      blitz: '',
+      coverage: '',
+    })));
+  };
+
+  // Save Game to Supabase
+  const saveGame = async () => {
+    if (!currentGameId) {
+      alert("Please start a new game first");
+      return;
+    }
+
+    const playsToSave = data.map((play) => ({
+      game_id: currentGameId,
+      play_number: play.playNumber,
+      odk: play.odk,
+      down: play.down,
+      dist: play.dist,
+      hash: play.hash,
+      gnls: play.gnls,
+      yard_line: play.yardLine,
+      play_type: play.playType,
+      result: play.result,
+      off_formation: play.offFormation,
+      defense: play.defense,
+      motion: play.motion,
+      off_play: play.offPlay,
+      rpo: play.rpo,
+      play_dir: play.playDir,
+      stunt: play.stunt,
+      blitz: play.blitz,
+      coverage: play.coverage,
+    }));
+
+    const { error } = await supabase
+      .from('plays')
+      .upsert(playsToSave, { onConflict: 'game_id,play_number' });
+
+    if (error) {
+      console.error(error);
+      alert("Failed to save game");
+    } else {
+      alert("Game saved successfully!");
+    }
+  };
+
+  const downloadCSV = () => {
+    const headers = columns.map(col => col.header as string);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row =>
+        columns.map(col => {
+          const val = (row as any)[col.id as keyof PlayEntry];
+          return val !== null && val !== undefined ? `"${val}"` : '';
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `${opponent || 'Game'}_${gameDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Top Nav */}
-      <nav className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md fixed w-full z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-bold text-xl">
-              K
+    <div className="min-h-screen bg-zinc-950 text-white p-6">
+      <div className="max-w-[95%] mx-auto">
+        {/* Header */}
+        <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 mb-6">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
+                <ArrowLeft size={22} /> Back
+              </button>
+              <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
             </div>
-            <div>
-              <div className="font-bold text-2xl tracking-tight">Kangaroos Stats</div>
-              <div className="text-xs text-zinc-500 -mt-1">HS Football</div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={startNewGame} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-xl font-medium">
+                <Play size={18} /> New Game
+              </button>
+
+              <input
+                type="text"
+                placeholder="Opponent Name"
+                value={opponent}
+                onChange={(e) => setOpponent(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 w-64 focus:outline-none focus:border-blue-500"
+              />
+
+              <input
+                type="date"
+                value={gameDate}
+                onChange={(e) => setGameDate(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
+              />
+
+              <button onClick={downloadCSV} className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl">
+                <Download size={18} /> CSV
+              </button>
+
+              <button onClick={saveGame} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-6 py-2.5 rounded-xl font-semibold">
+                <Save size={18} /> Save Game
+              </button>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-8 text-sm">
-            <a href="/" className="text-blue-400">Home</a>
-            <a href="/enter" className="hover:text-blue-400 transition-colors">Live Entry</a>
-            <a href="#" className="hover:text-blue-400 transition-colors">Games</a>
-            <a href="#" className="hover:text-blue-400 transition-colors">Analysis</a>
           </div>
         </div>
-      </nav>
 
-      <div className="pt-24 pb-16">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-          {/* Hero */}
-          <div className="mb-16 mt-8">
-            <div className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-1.5 text-sm mb-6">
-              <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              Ready for Game Day
-            </div>
-            
-            <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-6">
-              Kangaroos Football<br />
-              <span className="bg-gradient-to-r from-blue-400 to-white bg-clip-text text-transparent">
-                Stats & Scouting
-              </span>
-            </h1>
-            
-            <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-              Live play-by-play entry • Powerful tendency analysis • Opponent scouting
-            </p>
-          </div>
-
-          {/* Main Action Cards */}
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            
-            {/* Live Entry Card - Updated */}
-            <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-blue-500 transition-all group">
-              <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Play className="w-8 h-8 text-blue-500" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Live Data Entry</h3>
-              <p className="text-zinc-400 mb-8">
-                Enter plays in real-time like a Google Sheet.<br />
-                Smart auto calculations + multi-person support.
-              </p>
-              
-              <button 
-                className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-colors"
-                onClick={() => window.location.href = '/enter'}
-              >
-                START LIVE ENTRY <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Upload Card */}
-            <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-white transition-all group">
-              <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <Upload className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Upload Data</h3>
-              <p className="text-zinc-400 mb-8">
-                Import previous games from CSV files for offense and defense.
-              </p>
-              
-              <button className="w-full bg-white text-black py-4 rounded-2xl font-semibold hover:bg-zinc-200 transition-colors">
-                Upload Offense CSV
-              </button>
-              <button className="w-full mt-3 bg-transparent border border-zinc-700 py-4 rounded-2xl font-semibold hover:bg-zinc-800 transition-colors">
-                Upload Defense CSV
-              </button>
-            </div>
-
-            {/* Analyze Card */}
-            <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-blue-500 transition-all group">
-              <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <BarChart3 className="w-8 h-8 text-blue-500" />
-              </div>
-              <h3 className="text-2xl font-semibold mb-3">Analyze & Scout</h3>
-              <p className="text-zinc-400 mb-8">
-                View tendencies, success rates, and scout opponents.
-              </p>
-              
-              <div className="space-y-4">
-                <div className="relative">
-                  <select className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-5 text-white appearance-none">
-                    <option>Select Opponent</option>
-                    <option>Westside Warriors</option>
-                    <option>Central Tigers</option>
-                    <option>Riverside Rams</option>
-                  </select>
-                </div>
-                
-                <button className="w-full bg-zinc-800 hover:bg-zinc-700 py-4 rounded-2xl font-semibold transition-colors">
-                  View All Logged Games →
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Table */}
+        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
+          <table className="w-full border-collapse">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="bg-zinc-950 border-b-2 border-zinc-600 sticky top-0 z-10">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="px-4 py-4 text-left text-xs font-semibold text-zinc-300 whitespace-nowrap">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row, rowIndex) => (
+                <tr key={row.id} className={`border-b border-zinc-800 hover:bg-zinc-800/50 ${selectedCell.row === rowIndex ? 'bg-zinc-800/70' : ''}`}>
+                  {row.getVisibleCells().map((cell, colIndex) => (
+                    <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
+                      <EditableCell
+                        value={cell.getValue()}
+                        rowIndex={rowIndex}
+                        columnId={cell.column.id}
+                        colIndex={colIndex}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-
-      {/* Recent Games */}
-      <div className="bg-zinc-900 border-t border-zinc-800 py-16">
-        <div className="max-w-5xl mx-auto px-6">
-          <h2 className="text-3xl font-bold mb-8">Recent Games</h2>
-          
-          <div className="grid md:grid-cols-3 gap-6">
-            {[1,2,3].map((i) => (
-              <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 hover:border-zinc-600 transition-colors">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <div className="font-semibold">vs. Central Tigers</div>
-                    <div className="text-sm text-zinc-500">May 8, 2026</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-emerald-400 font-bold">W 28-14</div>
-                  </div>
-                </div>
-                <div className="text-sm text-zinc-400 space-y-1">
-                  <div>Offense: 312 yards • 4 TDs</div>
-                  <div>Defense: 3 sacks • 1 INT</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <footer className="border-t border-zinc-800 py-8 text-center text-zinc-500 text-sm">
-        Kangaroos Football • Built with ❤️ for the sideline
-      </footer>
     </div>
   );
 }
