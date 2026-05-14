@@ -1,14 +1,20 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Save, Play, Download, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { supabase } from '@/lib/supabase';   // ← Normal import
+import { supabase } from '@/lib/supabase';
+
+type Game = {
+  id: string;
+  opponent: string;
+  game_date: string;
+};
 
 type NumericField = number | '';
 
@@ -30,12 +36,12 @@ type PlayEntry = {
 };
 
 export default function OffenseEntry() {
-  const [opponent, setOpponent] = useState('');
-  const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
-  const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+  const [games, setGames] = useState<Game[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [isLoadingGames, setIsLoadingGames] = useState(true);
 
-  const [isStartingNewGame, setIsStartingNewGame] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const [data, setData] = useState<PlayEntry[]>(() => {
     const rows: PlayEntry[] = [];
@@ -60,6 +66,7 @@ export default function OffenseEntry() {
   });
 
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const columnHelper = createColumnHelper<PlayEntry>();
 
@@ -77,6 +84,69 @@ export default function OffenseEntry() {
     columnHelper.accessor('blitz', { header: 'BLITZ' }),
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
+
+  // Load Games for Dropdown
+  useEffect(() => {
+    const loadGames = async () => {
+      const { data, error } = await supabase
+        .from('games')
+        .select('id, opponent, game_date')
+        .order('game_date', { ascending: false });
+
+      if (error) console.error(error);
+      else setGames(data || []);
+      setIsLoadingGames(false);
+    };
+    loadGames();
+  }, []);
+
+  // Auto Save
+  const autoSave = useCallback(async () => {
+    if (!selectedGameId) return;
+
+    setIsSaving(true);
+    try {
+      const playsToSave = data.map((play) => ({
+        game_id: selectedGameId,
+        play_number: play.playNumber,
+        down: play.down,
+        dist: play.dist,
+        hash: play.hash,
+        yard_line: play.yardLine,
+        gnls: play.gnls,
+        off_formation: play.offFormation,
+        motion: play.motion,
+        off_play: play.offPlay,
+        ball_carrier: play.ballCarrier,
+        front: play.front,
+        blitz: play.blitz,
+        coverage: play.coverage,
+      }));
+
+      const { error } = await supabase
+        .from('plays')
+        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
+
+      if (error) throw error;
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [selectedGameId, data]);
+
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(autoSave, 2000);
+  }, [autoSave]);
+
+  useEffect(() => {
+    if (selectedGameId) triggerAutoSave();
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [data, selectedGameId, triggerAutoSave]);
 
   const updateField = (rowIndex: number, columnId: string, newValue: any) => {
     const newData = [...data];
@@ -118,19 +188,18 @@ export default function OffenseEntry() {
         onChange={(e) => updateField(rowIndex, columnId, e.target.value)}
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
         onKeyDown={(e) => {
-          const input = inputRef.current;
           switch (e.key) {
             case 'Enter': e.preventDefault(); moveToCell(rowIndex + 1, colIndex); break;
             case 'Tab': e.preventDefault(); moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1)); break;
             case 'ArrowDown': e.preventDefault(); moveToCell(rowIndex + 1, colIndex); break;
             case 'ArrowUp': e.preventDefault(); moveToCell(rowIndex - 1, colIndex); break;
             case 'ArrowRight':
-              if (input && input.selectionStart === input.value.length) {
+              if (inputRef.current?.selectionStart === inputRef.current?.value.length) {
                 e.preventDefault(); moveToCell(rowIndex, colIndex + 1);
               }
               break;
             case 'ArrowLeft':
-              if (input && input.selectionStart === 0) {
+              if (inputRef.current?.selectionStart === 0) {
                 e.preventDefault(); moveToCell(rowIndex, colIndex - 1);
               }
               break;
@@ -144,116 +213,6 @@ export default function OffenseEntry() {
   }
 
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
-
-  // Start New Game
-  const startNewGame = async () => {
-    if (!opponent.trim()) {
-      alert("Please enter an opponent name first.");
-      return;
-    }
-    if (!confirm('Start a new game? Current data will be lost.')) return;
-
-    setIsStartingNewGame(true);
-    try {
-      const { data: game, error } = await supabase
-        .from('games')
-        .insert({
-          opponent: opponent.trim(),
-          game_date: gameDate,
-          status: 'live'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setCurrentGameId(game.id);
-      alert("New game started successfully!");
-
-      setData(prev => prev.map((row, i) => ({
-        ...row,
-        down: i === 0 ? 1 : '',
-        dist: i === 0 ? 10 : '',
-        hash: '',
-        yardLine: i === 0 ? -25 : '',
-        gnls: '',
-        offFormation: '',
-        motion: '',
-        offPlay: '',
-        ballCarrier: '',
-        front: '',
-        blitz: '',
-        coverage: '',
-      })));
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || "Failed to create new game");
-    } finally {
-      setIsStartingNewGame(false);
-    }
-  };
-
-  // Save Game
-  const saveGame = async () => {
-    if (!currentGameId) {
-      alert("Please start a new game first");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const playsToSave = data.map((play) => ({
-        game_id: currentGameId,
-        play_number: play.playNumber,
-        down: play.down,
-        dist: play.dist,
-        hash: play.hash,
-        yard_line: play.yardLine,
-        gnls: play.gnls,
-        off_formation: play.offFormation,
-        motion: play.motion,
-        off_play: play.offPlay,
-        ball_carrier: play.ballCarrier,
-        front: play.front,
-        blitz: play.blitz,
-        coverage: play.coverage,
-      }));
-
-      const { error } = await supabase
-        .from('plays')
-        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
-
-      if (error) throw error;
-
-      alert("Offense data saved successfully!");
-    } catch (error: any) {
-      console.error(error);
-      alert(error.message || "Failed to save data");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const downloadCSV = () => {
-    const headers = columns.map(col => col.header as string);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row =>
-        columns.map(col => {
-          const val = (row as any)[col.id as keyof PlayEntry];
-          return val !== null && val !== undefined ? `"${val}"` : '';
-        }).join(',')
-      )
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.href = url;
-    link.download = `Offense_${opponent || 'Game'}_${gameDate}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
@@ -270,47 +229,48 @@ export default function OffenseEntry() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                onClick={startNewGame}
-                disabled={isStartingNewGame}
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-70 px-5 py-2.5 rounded-xl font-medium"
-              >
-                {isStartingNewGame ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-                {isStartingNewGame ? 'Creating...' : 'New Game'}
-              </button>
-
-              <input
-                type="text"
-                placeholder="Opponent Name"
-                value={opponent}
-                onChange={(e) => setOpponent(e.target.value)}
-                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 w-72 focus:outline-none focus:border-blue-500"
-              />
-
-              <input
-                type="date"
-                value={gameDate}
-                onChange={(e) => setGameDate(e.target.value)}
+            <div className="flex items-center gap-4">
+              {/* Game Selector */}
+              <select
+                value={selectedGameId || ''}
+                onChange={(e) => setSelectedGameId(e.target.value)}
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
-              />
-
-              <button onClick={downloadCSV} className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl">
-                <Download size={18} /> CSV
-              </button>
-
-              <button
-                onClick={saveGame}
-                disabled={isSaving || !currentGameId}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 px-6 py-2.5 rounded-xl font-semibold"
               >
-                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {isSaving ? 'Saving...' : 'Save Offense'}
+                <option value="">Select Game...</option>
+                {games.map((game) => (
+                  <option key={game.id} value={game.id}>
+                    {game.opponent} — {new Date(game.game_date).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+
+              {/* Navigation Buttons */}
+              <button 
+                onClick={() => window.location.href = '/enter'}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
+                ODK
               </button>
+              <button 
+                onClick={() => window.location.href = '/enter/defense'}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
+                DEFENSE
+              </button>
+
+              {/* Auto-save Status */}
+              <div className="text-sm flex items-center gap-2 text-zinc-400">
+                {isSaving ? (
+                  <span className="flex items-center gap-1"><Loader2 size={16} className="animate-spin" /> Saving...</span>
+                ) : lastSaved ? (
+                  <span className="flex items-center gap-1 text-emerald-500"><CheckCircle size={16} /> Auto-saved</span>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
 
+        {/* Table */}
         <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
           <table className="w-full border-collapse">
             <thead>
