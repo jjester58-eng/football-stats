@@ -316,7 +316,7 @@ export default function LiveEntry() {
               <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
                 <ArrowLeft size={22} /> Back
               </button>
-              <h1 className="text-4xl font-bold">Live Entry</h1>
+              <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
