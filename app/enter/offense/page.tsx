@@ -8,7 +8,7 @@ import {
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';   // ← Normal import
 
 type NumericField = number | '';
 
@@ -120,32 +120,18 @@ export default function OffenseEntry() {
         onKeyDown={(e) => {
           const input = inputRef.current;
           switch (e.key) {
-            case 'Enter':
-              e.preventDefault();
-              moveToCell(rowIndex + 1, colIndex);
-              break;
-            case 'Tab':
-              e.preventDefault();
-              moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
-              break;
-            case 'ArrowDown':
-              e.preventDefault();
-              moveToCell(rowIndex + 1, colIndex);
-              break;
-            case 'ArrowUp':
-              e.preventDefault();
-              moveToCell(rowIndex - 1, colIndex);
-              break;
+            case 'Enter': e.preventDefault(); moveToCell(rowIndex + 1, colIndex); break;
+            case 'Tab': e.preventDefault(); moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1)); break;
+            case 'ArrowDown': e.preventDefault(); moveToCell(rowIndex + 1, colIndex); break;
+            case 'ArrowUp': e.preventDefault(); moveToCell(rowIndex - 1, colIndex); break;
             case 'ArrowRight':
               if (input && input.selectionStart === input.value.length) {
-                e.preventDefault();
-                moveToCell(rowIndex, colIndex + 1);
+                e.preventDefault(); moveToCell(rowIndex, colIndex + 1);
               }
               break;
             case 'ArrowLeft':
               if (input && input.selectionStart === 0) {
-                e.preventDefault();
-                moveToCell(rowIndex, colIndex - 1);
+                e.preventDefault(); moveToCell(rowIndex, colIndex - 1);
               }
               break;
           }
@@ -168,7 +154,6 @@ export default function OffenseEntry() {
     if (!confirm('Start a new game? Current data will be lost.')) return;
 
     setIsStartingNewGame(true);
-
     try {
       const { data: game, error } = await supabase
         .from('games')
@@ -183,8 +168,8 @@ export default function OffenseEntry() {
       if (error) throw error;
 
       setCurrentGameId(game.id);
+      alert("New game started successfully!");
 
-      // Reset data
       setData(prev => prev.map((row, i) => ({
         ...row,
         down: i === 0 ? 1 : '',
@@ -200,11 +185,9 @@ export default function OffenseEntry() {
         blitz: '',
         coverage: '',
       })));
-
-      alert("New game started successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to create new game");
+      alert(error.message || "Failed to create new game");
     } finally {
       setIsStartingNewGame(false);
     }
@@ -218,7 +201,6 @@ export default function OffenseEntry() {
     }
 
     setIsSaving(true);
-
     try {
       const playsToSave = data.map((play) => ({
         game_id: currentGameId,
@@ -238,15 +220,15 @@ export default function OffenseEntry() {
       }));
 
       const { error } = await supabase
-        .from('plays')           // or 'offense_plays' if you have a separate table
+        .from('plays')
         .upsert(playsToSave, { onConflict: 'game_id,play_number' });
 
       if (error) throw error;
 
       alert("Offense data saved successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to save offense data");
+      alert(error.message || "Failed to save data");
     } finally {
       setIsSaving(false);
     }
@@ -292,7 +274,7 @@ export default function OffenseEntry() {
               <button
                 onClick={startNewGame}
                 disabled={isStartingNewGame}
-                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-70 px-5 py-2.5 rounded-xl font-medium transition"
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-70 px-5 py-2.5 rounded-xl font-medium"
               >
                 {isStartingNewGame ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
                 {isStartingNewGame ? 'Creating...' : 'New Game'}
@@ -320,7 +302,7 @@ export default function OffenseEntry() {
               <button
                 onClick={saveGame}
                 disabled={isSaving || !currentGameId}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 px-6 py-2.5 rounded-xl font-semibold transition"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 px-6 py-2.5 rounded-xl font-semibold"
               >
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
                 {isSaving ? 'Saving...' : 'Save Offense'}
@@ -329,7 +311,6 @@ export default function OffenseEntry() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
           <table className="w-full border-collapse">
             <thead>
