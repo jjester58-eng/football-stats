@@ -87,18 +87,20 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // Convert displayed yard line to absolute position (0 = own goal, 100 = opp goal)
-  const toAbsolute = (val: NumericField): number => {
+  // Your exact conversion: -48 = 48, 47 = 53, etc.
+  const toPosition = (val: NumericField): number => {
     if (val === '') return 50;
     const n = Number(val);
-    if (n < 0) return 50 + n;           // -25 → 25
+    if (n < 0) return -n;                    // -48 → 48
     if (n === 50) return 50;
-    return 50 + (50 - n);               // 35 → 65, 25 → 75, etc.
+    return 50 + (50 - n);                    // 47 → 53, 40 → 60, 25 → 75
   };
 
   const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
     if (prev === '' || current === '') return '';
-    return toAbsolute(current) - toAbsolute(prev);
+    const p = toPosition(prev);
+    const c = toPosition(current);
+    return c - p;   // Should be positive when advancing
   };
 
   const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
@@ -141,6 +143,7 @@ export default function LiveEntry() {
 
     (newData[rowIndex] as any)[columnId] = formatted;
 
+    // Auto Gain/Loss when Yard Line changes
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
@@ -148,6 +151,7 @@ export default function LiveEntry() {
       );
     }
 
+    // Auto Down & Distance
     if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
@@ -265,7 +269,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">-49 to 49 system • -25 to -35 = +10 gain</p>
+              <p className="text-emerald-500">-48 = 48 • 47 = 53 • Gain should be positive</p>
             </div>
           </div>
 
