@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Plus, Save, Users } from 'lucide-react';
+import { ArrowLeft, Plus, Save, Users, Download, Play } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -34,6 +34,9 @@ type PlayEntry = {
 };
 
 export default function LiveEntry() {
+  const [opponent, setOpponent] = useState('');
+  const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
+
   const [data, setData] = useState<PlayEntry[]>(() => {
     const rows: PlayEntry[] = [];
     for (let i = 1; i <= 200; i++) {
@@ -105,14 +108,13 @@ export default function LiveEntry() {
     const next = plays[index + 1];
     if (!next) return;
 
-    // Require gain and current down/dist to calculate
-    if (current.gnls === '' || current.down === '' || current.dist === '') return;
+    if (current.gnls === '' || current.dist === '' || current.down === '') return;
 
     const gain = Number(current.gnls);
-    const down = Number(current.down);
     const dist = Number(current.dist);
+    const down = Number(current.down);
 
-    if (isNaN(gain) || isNaN(down) || isNaN(dist)) return;
+    if (isNaN(gain) || isNaN(dist) || isNaN(down)) return;
 
     if (gain >= dist) {
       next.down = 1;
@@ -141,19 +143,14 @@ export default function LiveEntry() {
 
     (newData[rowIndex] as any)[columnId] = formatted;
 
-    // Auto Gain/Loss: when yardLine is entered, calculate gnls for PREVIOUS row,
-    // then update down/distance for CURRENT row based on that gnls
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
         formatted
       );
-      // After calculating gain/loss, update the current row's down/distance
-      updateNextDownDistance(newData, rowIndex - 1);
     }
 
-    // If gnls, down, or dist is manually entered on current row, update next row
-    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+    if (['yardLine', 'gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
 
@@ -260,29 +257,104 @@ export default function LiveEntry() {
     setData([...data, newPlay]);
   };
 
+  // Download CSV
+  const downloadCSV = () => {
+    const headers = columns.map(col => col.header as string);
+    
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        columns.map(col => {
+          const val = (row as any)[col.id as keyof PlayEntry];
+          return val !== null && val !== undefined ? `"${val}"` : '';
+        }).join(',')
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = `${opponent || 'Game'}_${gameDate}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const startNewGame = () => {
+    if (!confirm('Start a new game? Current data will be lost.')) return;
+    
+    setOpponent('');
+    setData(prev => prev.map((row, i) => ({
+      ...row,
+      down: i === 0 ? 1 : '',
+      dist: i === 0 ? 10 : '',
+      gnls: '',
+      yardLine: i === 0 ? -25 : '',
+      playType: '',
+      result: '',
+      offFormation: '',
+      defense: '',
+      motion: '',
+      offPlay: '',
+      rpo: '',
+      playDir: '',
+      stunt: '',
+      blitz: '',
+      coverage: '',
+    })));
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
       <div className="max-w-[95%] mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        {/* Game Header */}
+        <div className="flex flex-wrap gap-4 items-center justify-between mb-6 bg-zinc-900 border border-zinc-700 rounded-2xl p-4">
           <div className="flex items-center gap-4">
             <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
               <ArrowLeft size={22} /> Back
             </button>
             <div>
-              <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              </div>
+              <h1 className="text-3xl font-bold">Live Entry</h1>
+              <p className="text-emerald-500 text-sm">Kangaroos Football</p>
+            </div>
           </div>
 
-          <div className="flex gap-3">
-            <button onClick={addNewRow} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-2xl">
-              <Plus size={20} /> Add Row
+          <div className="flex items-center gap-3 flex-wrap">
+            <input
+              type="text"
+              placeholder="Opponent Name"
+              value={opponent}
+              onChange={(e) => setOpponent(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 w-64 focus:outline-none focus:border-blue-500"
+            />
+            <input
+              type="date"
+              value={gameDate}
+              onChange={(e) => setGameDate(e.target.value)}
+              className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 focus:outline-none focus:border-blue-500"
+            />
+
+            <button
+              onClick={startNewGame}
+              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2 rounded-xl"
+            >
+              <Play size={18} /> New Game
             </button>
-            <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-2xl font-semibold">
-              <Save size={20} /> Save Game
+
+            <button
+              onClick={downloadCSV}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-xl font-medium"
+            >
+              <Download size={18} /> Download CSV
+            </button>
+
+            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-xl font-semibold">
+              <Save size={18} /> Save Game
             </button>
           </div>
         </div>
 
+        {/* Table */}
         <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
           <table className="w-full border-collapse">
             <thead>
