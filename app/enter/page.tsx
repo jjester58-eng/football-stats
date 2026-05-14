@@ -148,9 +148,11 @@ export default function LiveEntry() {
         newData[rowIndex - 1].yardLine,
         formatted
       );
+      // After calculating gain/loss, update the current row's down/distance
+      updateNextDownDistance(newData, rowIndex - 1);
     }
 
-    if (['yardLine', 'gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
 
@@ -330,6 +332,7 @@ export default function LiveEntry() {
                 placeholder="Opponent Name"
                 value={opponent}
                 onChange={(e) => setOpponent(e.target.value)}
+                onFocus={() => setSelectedCell({ row: -1, col: -1 })}
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 w-64 focus:outline-none focus:border-blue-500"
               />
 
@@ -337,6 +340,7 @@ export default function LiveEntry() {
                 type="date"
                 value={gameDate}
                 onChange={(e) => setGameDate(e.target.value)}
+                onFocus={() => setSelectedCell({ row: -1, col: -1 })}
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
               />
 
