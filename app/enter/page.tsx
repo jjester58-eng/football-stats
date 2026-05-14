@@ -141,16 +141,19 @@ export default function LiveEntry() {
 
     (newData[rowIndex] as any)[columnId] = formatted;
 
-    // Auto Gain/Loss
+    // Auto Gain/Loss: when yardLine is entered, calculate gnls for PREVIOUS row,
+    // then update down/distance for CURRENT row based on that gnls
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
         formatted
       );
+      // After calculating gain/loss, update the current row's down/distance
+      updateNextDownDistance(newData, rowIndex - 1);
     }
 
-    // Trigger Down/Distance update more aggressively
-    if (['yardLine', 'gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+    // If gnls, down, or dist is manually entered on current row, update next row
+    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
 
@@ -267,7 +270,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">Yard Line Working • Trying to fix D&D</p>
+              <p className="text-emerald-500">Yard Line Working • Down & Distance Fixed</p>
             </div>
           </div>
 
