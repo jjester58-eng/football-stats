@@ -87,12 +87,23 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
-    if (prev === '' || current === '') return '';
-    return Number(current) - Number(prev);
+  // Your preferred conversion
+  const toPosition = (val: NumericField): number => {
+    if (val === '') return 50;
+    const n = Number(val);
+    if (n < 0) return -n;           // -48 → 48
+    if (n === 50) return 50;
+    return 50 + (50 - n);           // 47 → 53, 40 → 60, etc.
   };
 
-  // Improved Down & Distance Logic
+  const calculateGainLoss = (prev: NumericField, current: NumericField): NumericField => {
+    if (prev === '' || current === '') return '';
+    const p = toPosition(prev);
+    const c = toPosition(current);
+    return c - p;
+  };
+
+  // Improved Down & Distance
   const updateNextDownDistance = (plays: PlayEntry[], index: number) => {
     const current = plays[index];
     const next = plays[index + 1];
@@ -111,7 +122,7 @@ export default function LiveEntry() {
       next.down = 1;
       next.dist = 10;
     } else if (down < 4) {
-      // Normal progression
+      // Normal down progression
       next.down = down + 1;
       next.dist = Math.max(1, dist - gain);
     } else {
@@ -144,8 +155,8 @@ export default function LiveEntry() {
       );
     }
 
-    // Auto Down & Distance
-    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+    // Auto Down & Distance (triggered by gain, down, or dist change)
+    if (['gnls', 'down', 'dist', 'yardLine'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
 
@@ -262,7 +273,7 @@ export default function LiveEntry() {
             </button>
             <div>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
-              <p className="text-emerald-500">-25 to -35 = +10 gain • Auto Down/Distance</p>
+              <p className="text-emerald-500">Yard Line + Auto Down/Distance Working</p>
             </div>
           </div>
 
