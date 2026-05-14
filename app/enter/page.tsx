@@ -143,14 +143,17 @@ export default function LiveEntry() {
 
     (newData[rowIndex] as any)[columnId] = formatted;
 
+    // Auto Gain/Loss + trigger Down/Distance on current row
     if (columnId === 'yardLine' && rowIndex > 0) {
       newData[rowIndex - 1].gnls = calculateGainLoss(
         newData[rowIndex - 1].yardLine,
         formatted
       );
+      updateNextDownDistance(newData, rowIndex - 1);   // Important: use previous row index
     }
 
-    if (['yardLine', 'gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
+    // Also trigger if GN/LS, Down, or Dist is changed directly
+    if (['gnls', 'down', 'dist'].includes(columnId) && rowIndex < newData.length - 1) {
       updateNextDownDistance(newData, rowIndex);
     }
 
@@ -284,7 +287,6 @@ export default function LiveEntry() {
 
   const downloadCSV = () => {
     const headers = columns.map(col => col.header as string);
-    
     const csvContent = [
       headers.join(','),
       ...data.map(row => 
@@ -307,9 +309,8 @@ export default function LiveEntry() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
       <div className="max-w-[95%] mx-auto">
-        {/* Header with New Game Options */}
         <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 mb-6">
-          <div className="flex flex-wrap gap-4 items-start justify-between">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex items-center gap-4">
               <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
                 <ArrowLeft size={22} /> Back
@@ -317,43 +318,11 @@ export default function LiveEntry() {
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {/* New Game Button */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={startNewGame}
-                  className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl font-medium"
-                >
-                  <Play size={18} /> New Game
-                </button>
-              </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button onClick={startNewGame} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-xl font-medium">
+                <Play size={18} /> New Game
+              </button>
 
-              {/* Navigation Buttons */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.location.href = '/workspaces/football-stats/app/enter/page.tsx'}
-                  className="bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl text-sm font-medium"
-                >
-                  ODK
-                </button>
-
-                <button
-                  onClick={() => window.location.href = '/workspaces/football-stats/app/enter/offense.tsx'}
-                  className="bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl text-sm font-medium"
-                >
-                  OFFENSE
-                </button>
-
-                <button
-                  onClick={() => window.location.href = '/workspaces/football-stats/app/enter/defense.tsx'}
-                  className="bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl text-sm font-medium"
-                >
-                  DEFENSE
-                </button>
-              </div>
-            </div>
-
-            <div className="flex gap-3 flex-wrap">
               <input
                 type="text"
                 placeholder="Opponent Name"
@@ -369,10 +338,7 @@ export default function LiveEntry() {
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
               />
 
-              <button
-                onClick={downloadCSV}
-                className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl"
-              >
+              <button onClick={downloadCSV} className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl">
                 <Download size={18} /> CSV
               </button>
 
@@ -383,7 +349,6 @@ export default function LiveEntry() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
           <table className="w-full border-collapse">
             <thead>
