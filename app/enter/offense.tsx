@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Save, Users } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import {
+  useReactTable,
+  getCoreRowModel,
+  createColumnHelper,
+  flexRender,
+} from '@tanstack/react-table';
+
+type NumericField = number | '';
 
 type PlayEntry = {
-  id: string;
+  id: number;
   playNumber: number;
-  down: number | '';
-  dist: number | '';
+  down: NumericField;
+  dist: NumericField;
   hash: string;
-  yardLine: number | '';
-  gnls: number | '';
+  yardLine: NumericField;
+  gnls: NumericField;
   offFormation: string;
   motion: string;
   offPlay: string;
@@ -23,35 +30,130 @@ type PlayEntry = {
 
 export default function OffenseEntry() {
   const [opponent, setOpponent] = useState('');
-  const [data, setData] = useState<PlayEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
 
-  // Load plays from main entry (we'll filter by game later)
-  useEffect(() => {
-    const loadPlays = async () => {
-      const { data: plays, error } = await supabase
-        .from('plays')
-        .select('*')
-        .order('play_number', { ascending: true });
+  const [data, setData] = useState<PlayEntry[]>(() => {
+    const rows: PlayEntry[] = [];
+    for (let i = 1; i <= 200; i++) {
+      rows.push({
+        id: i,
+        playNumber: i,
+        down: i === 1 ? 1 : '',
+        dist: i === 1 ? 10 : '',
+        hash: '',
+        yardLine: i === 1 ? -25 : '',
+        gnls: '',
+        offFormation: '',
+        motion: '',
+        offPlay: '',
+        ballCarrier: '',
+        front: '',
+        blitz: '',
+        coverage: '',
+      });
+    }
+    return rows;
+  });
 
-      if (error) console.error(error);
-      else setData(plays || []);
-      setLoading(false);
-    };
+  const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
 
-    loadPlays();
-  }, []);
+  const columnHelper = createColumnHelper<PlayEntry>();
 
-  const updateOffenseField = async (playId: string, field: string, value: string) => {
-    const { error } = await supabase
-      .from('plays')
-      .update({ [field]: value })
-      .eq('id', playId);
+  const columns = [
+    columnHelper.accessor('playNumber', { header: 'PLAY #' }),
+    columnHelper.accessor('down', { header: 'DN' }),
+    columnHelper.accessor('dist', { header: 'DIST' }),
+    columnHelper.accessor('yardLine', { header: 'YARD LN' }),
+    columnHelper.accessor('gnls', { header: 'GN/LS' }),
+    columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
+    columnHelper.accessor('motion', { header: 'MOTION' }),
+    columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
+    columnHelper.accessor('ballCarrier', { header: 'BALL CARRIER' }),
+    columnHelper.accessor('front', { header: 'FRONT' }),
+    columnHelper.accessor('blitz', { header: 'BLITZ' }),
+    columnHelper.accessor('coverage', { header: 'COVERAGE' }),
+  ];
 
-    if (error) console.error(error);
+  const updateField = (rowIndex: number, columnId: string, newValue: any) => {
+    const newData = [...data];
+    (newData[rowIndex] as any)[columnId] = newValue;
+    setData(newData);
   };
 
-  if (loading) return <div className="p-10 text-center">Loading plays...</div>;
+  const moveToCell = (row: number, col: number) => {
+    setSelectedCell({
+      row: Math.max(0, Math.min(row, data.length - 1)),
+      col: Math.max(0, Math.min(col, columns.length - 1)),
+    });
+  };
+
+  function EditableCell({
+    value,
+    rowIndex,
+    columnId,
+    colIndex,
+  }: {
+    value: any;
+    rowIndex: number;
+    columnId: string;
+    colIndex: number;
+  }) {
+    const isSelected = selectedCell.row === rowIndex && selectedCell.col === colIndex;
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (isSelected && inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, [isSelected]);
+
+    return (
+      <input
+        ref={inputRef}
+        value={value ?? ''}
+        onChange={(e) => updateField(rowIndex, columnId, e.target.value)}
+        onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+        onKeyDown={(e) => {
+          const input = inputRef.current;
+          switch (e.key) {
+            case 'Enter':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'Tab':
+              e.preventDefault();
+              moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'ArrowUp':
+              e.preventDefault();
+              moveToCell(rowIndex - 1, colIndex);
+              break;
+            case 'ArrowRight':
+              if (input && input.selectionStart === input.value.length) {
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex + 1);
+              }
+              break;
+            case 'ArrowLeft':
+              if (input && input.selectionStart === 0) {
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex - 1);
+              }
+              break;
+          }
+        }}
+        className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
+          isSelected ? 'border-blue-500 bg-zinc-800' : 'border-transparent hover:border-zinc-700'
+        }`}
+      />
+    );
+  }
+
+  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
@@ -99,75 +201,18 @@ export default function OffenseEntry() {
               </tr>
             </thead>
             <tbody>
-              {data.map((play, rowIndex) => (
-                <tr key={play.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
-                  <td className="px-4 py-3">{play.playNumber}</td>
-                  <td className="px-4 py-3">{play.down}</td>
-                  <td className="px-4 py-3">{play.dist}</td>
-                  <td className="px-4 py-3">{play.yardLine}</td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.offFormation || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'offFormation', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.motion || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'motion', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.offPlay || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'offPlay', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.ballCarrier || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'ball_carrier', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.front || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'front', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.blitz || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'blitz', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
-
-                  <td className="px-2 py-1">
-                    <input
-                      type="text"
-                      value={play.coverage || ''}
-                      onChange={(e) => updateOffenseField(play.id!, 'coverage', e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-1 text-center"
-                    />
-                  </td>
+              {table.getRowModel().rows.map((row, rowIndex) => (
+                <tr key={row.id} className={`border-b border-zinc-800 hover:bg-zinc-800/50 ${selectedCell.row === rowIndex ? 'bg-zinc-800/70' : ''}`}>
+                  {row.getVisibleCells().map((cell, colIndex) => (
+                    <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
+                      <EditableCell
+                        value={cell.getValue()}
+                        rowIndex={rowIndex}
+                        columnId={cell.column.id}
+                        colIndex={colIndex}
+                      />
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
