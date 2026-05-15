@@ -264,7 +264,98 @@ export default function LiveEntry() {
       ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
   }, [activeCell]);
 
-  const filledRows = rows.filter(r => columns.some(c => c.editable && (r as any)[c.key])).length;
+const filledRows = rows.filter(r =>
+  columns.some(c => c.editable && (r as any)[c.key])
+).length;
 
+return (
+  <div className="p-4 bg-gray-900 min-h-screen text-white">
+    <div className="flex items-center gap-4 mb-4">
+      <h1 className="text-2xl font-bold">Live Entry</h1>
+
+      <button
+        onClick={handleExportCSV}
+        className="px-3 py-2 bg-blue-600 rounded"
+      >
+        Export TSV
+      </button>
+
+      <div>
+        Plays Entered: {filledRows}
+      </div>
+
+      <div>
+        Status: {syncStatus}
+      </div>
+    </div>
+
+    {error && (
+      <div className="mb-4 p-2 bg-red-700 rounded">
+        {error}
+      </div>
+    )}
+
+    <div
+      ref={gridRef}
+      className="overflow-auto border border-gray-700"
+    >
+      <table className="border-collapse min-w-max">
+        <thead className="sticky top-0 bg-gray-800">
+          <tr>
+            {allColumns.map(col => (
+              <th
+                key={col.key}
+                className="border border-gray-700 px-2 py-1 text-xs"
+                style={{ width: col.width }}
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.map((row, rowIdx) => (
+            <tr key={rowIdx}>
+              {allColumns.map(col => (
+                <td
+                  key={col.key}
+                  className="border border-gray-700 p-0"
+                >
+                  {col.editable ? (
+                    <input
+                      id={`cell-${rowIdx}-${col.key}`}
+                      type="text"
+                      value={(row as any)[col.key] ?? ''}
+                      onChange={(e) =>
+                        handleCellChange(
+                          rowIdx,
+                          col.key,
+                          e.target.value
+                        )
+                      }
+                      onFocus={() =>
+                        setActiveCell({
+                          row: rowIdx,
+                          col: col.key,
+                        })
+                      }
+                      onKeyDown={handleKeyDown}
+                      className="w-full px-2 py-1 bg-gray-900 text-white outline-none"
+                    />
+                  ) : (
+                    <div className="px-2 py-1 text-gray-300">
+                      {(row as any)[col.key] ?? ''}
+                    </div>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
   // ... your JSX unchanged, just ensure supabase null checks are in place
 }
