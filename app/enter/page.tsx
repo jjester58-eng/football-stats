@@ -1,361 +1,319 @@
-// app/enter/page.tsx
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Download, AlertCircle } from 'lucide-react';
-import { useSupabase } from '@/types/useSupabase';
-import type { Play } from '@/types/supabase';
 
-interface Column {
-  key: string;
-  label: string;
-  width: number;
-  editable: boolean;
-  type: 'text' | 'number';
-  group?: string;
-  help?: string;
-}
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
+import {
+  useReactTable,
+  getCoreRowModel,
+  createColumnHelper,
+  flexRender,
+} from '@tanstack/react-table';
+import { supabase } from '@/lib/supabase';
 
-type RowData = Partial<Play> & {
-  playNum: number;
-  newYardLn?: string | number;
-  nextDn?: string | number;
-  newDist?: string | number;
+type Game = {
+  id: string;
+  opponent: string;
+  game_date: string;
 };
 
-// ─── Auto-calculation: down/distance/gain-loss logic ───────────────────────
-const calculateStats = (row: RowData): RowData => {
-  const updated = { ...row };
-  const gnLsRaw = String(updated.gn_ls ?? '').trim().toLowerCase();
-  const gainLoss = parseFloat(gnLsRaw);
-  const currentYard = Number(updated.yard_ln);
-  const currentDown = Number(updated.dn);
-  const distance = Number(updated.dist);
+type NumericField = number | '';
 
-  const hasGain = !isNaN(gainLoss);
-  const hasYard = !isNaN(currentYard) && currentYard > 0;
-  const hasDown = !isNaN(currentDown) && currentDown > 0;
-  const hasDist = !isNaN(distance) && distance > 0;
+type PlayEntry = {
+  id?: string;
+  playNumber: number;
+  down: NumericField;
+  dist: NumericField;
+  hash: string;
+  yardLine: NumericField;
+  gnls: NumericField;
+  offFormation: string;
+  motion: string;
+  offPlay: string;
+  ballCarrier: string;
+  front: string;
+  blitz: string;
+  coverage: string;
+};
 
-  // Special results take priority
-  const isSack = gnLsRaw.includes('sack');
-  const isTurnover = gnLsRaw.includes('turnover') || gnLsRaw.includes('to');
+export default function OffenseEntry() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const [isLoadingGames, setIsLoadingGames] = useState(true);
 
-  if (isSack) {
-    updated.result = 'SACK';
-  } else if (isTurnover) {
-    updated.result = 'TURNOVER';
-    updated.nextDn = 'TOV';
-    updated.newDist = '-';
-    updated.newYardLn = '-';
-    return updated;
-  }
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
-  // New yard line
-  if (hasYard && hasGain) {
-    updated.newYardLn = Math.max(0, Math.min(100, currentYard + gainLoss));
-  }
-
-  // Next down + new distance
-  if (hasDown && hasDist && hasGain) {
-    const gained = gainLoss;
-    if (gained >= distance) {
-      // First down earned
-      updated.nextDn = 1;
-      updated.newDist = 10;
-      if (!isSack) updated.result = gained >= distance ? 'FIRST DOWN' : updated.result;
-    } else if (currentDown < 4) {
-      updated.nextDn = currentDown + 1;
-      updated.newDist = Math.max(1, distance - gainLoss);
-    } else {
-      // 4th down stop = turnover on downs
-      updated.nextDn = 'TOD';
-      updated.newDist = '-';
-      updated.result = 'TURNOVER ON DOWNS';
+  const [data, setData] = useState<PlayEntry[]>(() => {
+    const rows: PlayEntry[] = [];
+    for (let i = 1; i <= 200; i++) {
+      rows.push({
+        playNumber: i,
+        down: i === 1 ? 1 : '',
+        dist: i === 1 ? 10 : '',
+        hash: '',
+        yardLine: i === 1 ? -25 : '',
+        gnls: '',
+        offFormation: '',
+        motion: '',
+        offPlay: '',
+        ballCarrier: '',
+        front: '',
+        blitz: '',
+        coverage: '',
+      });
     }
-  }
+    return rows;
+  });
 
-  return updated;
-};
+  const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-export default function LiveEntry() {
-  const { supabase, isReady, error: supabaseError } = useSupabase();
-  const [rows, setRows] = useState<RowData[]>([]);
-  const [activeCell, setActiveCell] = useState<{ row: number; col: string }>({ row: 0, col: 'odk' });
-  const [syncStatus, setSyncStatus] = useState<'ready' | 'syncing' | 'error'>('ready');
-  const [gameId, setGameId] = useState<string | null>(null);
-  const [error, setError] = useState('');
-  const [showCalculations, setShowCalculations] = useState(true);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const columnHelper = createColumnHelper<PlayEntry>();
 
-  const columns: Column[] = [
-    { key: 'play_number', label: 'PLAY #',   width: 70,  editable: false, type: 'number', group: 'core' },
-    { key: 'odk',         label: 'ODK',      width: 60,  editable: true,  type: 'text',   group: 'core' },
-    { key: 'dn',          label: 'DN',       width: 50,  editable: true,  type: 'number', group: 'core' },
-    { key: 'dist',        label: 'DIST',     width: 60,  editable: true,  type: 'number', group: 'core' },
-    { key: 'hash',        label: 'HASH',     width: 70,  editable: true,  type: 'text',   group: 'core' },
-    { key: 'gn_ls',       label: 'GN/LS',   width: 70,  editable: true,  type: 'text',   group: 'core', help: 'e.g. 5, -3, sack, turnover' },
-    { key: 'yard_ln',     label: 'YARD LN', width: 80,  editable: true,  type: 'number', group: 'core' },
-    { key: 'play_type',   label: 'PLAY TYPE',width: 100, editable: true,  type: 'text',   group: 'play' },
-    { key: 'result',      label: 'RESULT',  width: 100, editable: true,  type: 'text',   group: 'play' },
-    { key: 'off_form',    label: 'OFF FORM', width: 100, editable: true,  type: 'text',   group: 'formation' },
-    { key: 'defense',     label: 'DEFENSE', width: 100, editable: true,  type: 'text',   group: 'formation' },
-    { key: 'motion',      label: 'MOTION',  width: 90,  editable: true,  type: 'text',   group: 'formation' },
-    { key: 'off_play',    label: 'OFF PLAY', width: 120, editable: true,  type: 'text',   group: 'play' },
-    { key: 'rpo',         label: 'RPO',      width: 70,  editable: true,  type: 'text',   group: 'play' },
-    { key: 'play_dir',    label: 'PLAY DIR', width: 100, editable: true,  type: 'text',   group: 'play' },
-    { key: 'stunt',       label: 'STUNT',   width: 80,  editable: true,  type: 'text',   group: 'defense' },
-    { key: 'blitz',       label: 'BLITZ',   width: 80,  editable: true,  type: 'text',   group: 'defense' },
-    { key: 'coverage',    label: 'COVERAGE',width: 100, editable: true,  type: 'text',   group: 'defense' },
+  const columns = [
+    columnHelper.accessor('playNumber', { header: 'PLAY #' }),
+    columnHelper.accessor('down', { header: 'DN' }),
+    columnHelper.accessor('dist', { header: 'DIST' }),
+    columnHelper.accessor('yardLine', { header: 'YARD LN' }),
+    columnHelper.accessor('gnls', { header: 'GN/LS' }),
+    columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
+    columnHelper.accessor('motion', { header: 'MOTION' }),
+    columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
+    columnHelper.accessor('ballCarrier', { header: 'BALL CARRIER' }),
+    columnHelper.accessor('front', { header: 'FRONT' }),
+    columnHelper.accessor('blitz', { header: 'BLITZ' }),
+    columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  const calculatedColumns: Column[] = [
-    { key: 'newYardLn', label: 'NEW YD LN', width: 90, editable: false, type: 'number', help: 'Auto-calculated' },
-    { key: 'nextDn',    label: 'NEXT DN',   width: 70, editable: false, type: 'text',   help: 'Auto-calculated' },
-    { key: 'newDist',   label: 'NEW DIST',  width: 80, editable: false, type: 'number', help: 'Auto-calculated' },
-  ];
-
-  const allColumns = showCalculations ? [...columns, ...calculatedColumns] : columns;
-
-  // Initialize 200 rows
+  // Load Games
   useEffect(() => {
-    setRows(
-      Array.from({ length: 200 }, (_, i) => ({
-        play_number: i + 1,
-        playNum: i + 1,
-        odk: '', dn: undefined, dist: undefined, hash: '',
-        gn_ls: '', yard_ln: undefined, play_type: '', result: '',
-        off_form: '', defense: '', motion: '', off_play: '',
-        rpo: '', play_dir: '', stunt: '', blitz: '', coverage: '',
-        newYardLn: '', nextDn: '', newDist: '',
-      }))
-    );
+    const loadGames = async () => {
+      const { data, error } = await supabase
+        .from('games')
+        .select('id, opponent, game_date')
+        .order('game_date', { ascending: false });
+
+      if (error) console.error(error);
+      else setGames(data || []);
+      setIsLoadingGames(false);
+    };
+    loadGames();
   }, []);
 
-  // Initialize game
+  // Auto Save - Fixed Type Error
+  const autoSave = useCallback(async () => {
+    if (!selectedGameId) return;
+
+    setIsSaving(true);
+    try {
+      const playsToSave = data.map((play) => ({
+        game_id: selectedGameId,
+        play_number: play.playNumber,
+        down: play.down || null,
+        dist: play.dist || null,
+        hash: play.hash || null,
+        yard_line: play.yardLine || null,
+        gnls: play.gnls || null,
+        off_formation: play.offFormation || null,
+        motion: play.motion || null,
+        off_play: play.offPlay || null,
+        ball_carrier: play.ballCarrier || null,
+        front: play.front || null,
+        blitz: play.blitz || null,
+        coverage: play.coverage || null,
+      }));
+
+      const { error } = await supabase
+        .from('plays')
+        .upsert(playsToSave as any, { onConflict: 'game_id,play_number' });
+
+      if (error) throw error;
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [selectedGameId, data]);
+
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(autoSave, 2000);
+  }, [autoSave]);
+
   useEffect(() => {
-    if (isReady && supabase && !gameId) initializeGame();
-  }, [isReady, supabase]);
+    if (selectedGameId) triggerAutoSave();
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [data, selectedGameId, triggerAutoSave]);
 
-  const initializeGame = async () => {
-    if (!supabase) return;
-    try {
-      const { data, error: err } = await supabase
-        .from('games')
-        .insert([{ opponent: 'Central Tigers', date: new Date().toISOString(), status: 'live' }])
-        .select();
-      if (err) throw err;
-      if (data?.[0]) setGameId(data[0].id);
-    } catch (err) {
-      setError(`Game init: ${err instanceof Error ? err.message : err}`);
-    }
+  const updateField = (rowIndex: number, columnId: string, newValue: any) => {
+    const newData = [...data];
+    (newData[rowIndex] as any)[columnId] = newValue;
+    setData(newData);
   };
 
-  const syncToSupabase = async (rowData: RowData) => {
-    if (!supabase || !gameId) return;
-    setSyncStatus('syncing');
-    try {
-      const { error: err } = await supabase.from('plays').upsert(
-        {
-          id: `${gameId}-${rowData.playNum}`,
-          game_id: gameId,
-          play_number: rowData.playNum,
-          odk: rowData.odk || null,
-          dn: typeof rowData.dn === 'number' ? rowData.dn : null,
-          dist: typeof rowData.dist === 'number' ? rowData.dist : null,
-          hash: rowData.hash || null,
-          gn_ls: rowData.gn_ls || null,
-          yard_ln: typeof rowData.yard_ln === 'number' ? rowData.yard_ln : null,
-          play_type: rowData.play_type || null,
-          result: rowData.result || null,
-          off_form: rowData.off_form || null,
-          defense: rowData.defense || null,
-          motion: rowData.motion || null,
-          off_play: rowData.off_play || null,
-          rpo: rowData.rpo || null,
-          play_dir: rowData.play_dir || null,
-          stunt: rowData.stunt || null,
-          blitz: rowData.blitz || null,
-          coverage: rowData.coverage || null,
-          synced_at: new Date().toISOString(),
-        },
-        { onConflict: 'id' }
-      );
-      if (err) throw err;
-      setSyncStatus('ready');
-    } catch (err) {
-      setSyncStatus('error');
-      setError(`Sync failed: ${err instanceof Error ? err.message : err}`);
-      setTimeout(() => setSyncStatus('ready'), 3000);
-    }
+  const moveToCell = (row: number, col: number) => {
+    setSelectedCell({
+      row: Math.max(0, Math.min(row, data.length - 1)),
+      col: Math.max(0, Math.min(col, columns.length - 1)),
+    });
   };
 
-  const handleCellChange = (rowIdx: number, colKey: string, value: string) => {
-    const newRows = [...rows];
-    (newRows[rowIdx] as any)[colKey] = value === '' ? undefined : value;
-    newRows[rowIdx] = calculateStats(newRows[rowIdx]);
-    setRows(newRows);
-    clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => syncToSupabase(newRows[rowIdx]), 1000);
-  };
+  function EditableCell({
+    value,
+    rowIndex,
+    columnId,
+    colIndex,
+  }: {
+    value: any;
+    rowIndex: number;
+    columnId: string;
+    colIndex: number;
+  }) {
+    const isSelected = selectedCell.row === rowIndex && selectedCell.col === colIndex;
+    const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const { row, col } = activeCell;
-    const currentColIdx = allColumns.findIndex(c => c.key === col);
-    const editableCols = allColumns.filter(c => c.editable);
-
-    switch (e.key) {
-      case 'Tab': {
-        e.preventDefault();
-        const editableIdx = editableCols.findIndex(c => c.key === col);
-        if (e.shiftKey) {
-          if (editableIdx > 0) setActiveCell({ row, col: editableCols[editableIdx - 1].key });
-        } else {
-          if (editableIdx < editableCols.length - 1) setActiveCell({ row, col: editableCols[editableIdx + 1].key });
-        }
-        break;
+    useEffect(() => {
+      if (isSelected && inputRef.current) {
+        inputRef.current.focus();
       }
-      case 'Enter':
-        e.preventDefault();
-        if (row < rows.length - 1) setActiveCell({ row: row + 1, col });
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        if (row < rows.length - 1) setActiveCell({ row: row + 1, col });
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        if (row > 0) setActiveCell({ row: row - 1, col });
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (currentColIdx < allColumns.length - 1) {
-          const next = allColumns.slice(currentColIdx + 1).find(c => c.editable);
-          if (next) setActiveCell({ row, col: next.key });
-        }
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (currentColIdx > 0) {
-          const prev = allColumns.slice(0, currentColIdx).reverse().find(c => c.editable);
-          if (prev) setActiveCell({ row, col: prev.key });
-        }
-        break;
-    }
-  };
+    }, [isSelected]);
 
-  const handleExportCSV = () => {
-    const filled = rows.filter(r => columns.some(c => c.editable && (r as any)[c.key]));
-    const csv = [
-      columns.map(c => c.label).join('\t'),
-      ...filled.map(row => columns.map(c => (row as any)[c.key] ?? '').join('\t')),
-    ].join('\n');
-    const blob = new Blob([csv], { type: 'text/tab-separated-values' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `kangaroos-game-${new Date().toISOString().split('T')[0]}.tsv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    return (
+      <input
+        ref={inputRef}
+        value={value ?? ''}
+        onChange={(e) => updateField(rowIndex, columnId, e.target.value)}
+        onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
+        onKeyDown={(e) => {
+          switch (e.key) {
+            case 'Enter':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'Tab':
+              e.preventDefault();
+              moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'ArrowUp':
+              e.preventDefault();
+              moveToCell(rowIndex - 1, colIndex);
+              break;
+            case 'ArrowRight':
+              if (inputRef.current?.selectionStart === inputRef.current?.value.length) {
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex + 1);
+              }
+              break;
+            case 'ArrowLeft':
+              if (inputRef.current?.selectionStart === 0) {
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex - 1);
+              }
+              break;
+          }
+        }}
+        className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
+          isSelected ? 'border-blue-500 bg-zinc-800' : 'border-transparent hover:border-zinc-700'
+        }`}
+      />
+    );
+  }
 
-  useEffect(() => {
-    document.getElementById(`cell-${activeCell.row}-${activeCell.col}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-  }, [activeCell]);
+  const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
-const filledRows = rows.filter(r =>
-  columns.some(c => c.editable && (r as any)[c.key])
-).length;
+  return (
+    <div className="min-h-screen bg-zinc-950 text-white p-6">
+      <div className="max-w-[95%] mx-auto">
+        <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 mb-6">
+          <div className="flex flex-wrap gap-4 items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
+                <ArrowLeft size={22} /> Back
+              </button>
+              <div>
+                <h1 className="text-4xl font-bold">Offense Detailed Entry</h1>
+                <p className="text-emerald-500">Formation • Motion • Ball Carrier • Blitz</p>
+              </div>
+            </div>
 
-return (
-  <div className="p-4 bg-gray-900 min-h-screen text-white">
-    <div className="flex items-center gap-4 mb-4">
-      <h1 className="text-2xl font-bold">Live Entry</h1>
-
-      <button
-        onClick={handleExportCSV}
-        className="px-3 py-2 bg-blue-600 rounded"
-      >
-        Export TSV
-      </button>
-
-      <div>
-        Plays Entered: {filledRows}
-      </div>
-
-      <div>
-        Status: {syncStatus}
-      </div>
-    </div>
-
-    {error && (
-      <div className="mb-4 p-2 bg-red-700 rounded">
-        {error}
-      </div>
-    )}
-
-    <div
-      ref={gridRef}
-      className="overflow-auto border border-gray-700"
-    >
-      <table className="border-collapse min-w-max">
-        <thead className="sticky top-0 bg-gray-800">
-          <tr>
-            {allColumns.map(col => (
-              <th
-                key={col.key}
-                className="border border-gray-700 px-2 py-1 text-xs"
-                style={{ width: col.width }}
+            <div className="flex items-center gap-4">
+              <select
+                value={selectedGameId || ''}
+                onChange={(e) => setSelectedGameId(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
               >
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
+                <option value="">Select Game...</option>
+                {games.map((game) => (
+                  <option key={game.id} value={game.id}>
+                    {game.opponent} — {new Date(game.game_date).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
 
-        <tbody>
-          {rows.map((row, rowIdx) => (
-            <tr key={rowIdx}>
-              {allColumns.map(col => (
-                <td
-                  key={col.key}
-                  className="border border-gray-700 p-0"
-                >
-                  {col.editable ? (
-                    <input
-                      id={`cell-${rowIdx}-${col.key}`}
-                      type="text"
-                      value={(row as any)[col.key] ?? ''}
-                      onChange={(e) =>
-                        handleCellChange(
-                          rowIdx,
-                          col.key,
-                          e.target.value
-                        )
-                      }
-                      onFocus={() =>
-                        setActiveCell({
-                          row: rowIdx,
-                          col: col.key,
-                        })
-                      }
-                      onKeyDown={handleKeyDown}
-                      className="w-full px-2 py-1 bg-gray-900 text-white outline-none"
-                    />
-                  ) : (
-                    <div className="px-2 py-1 text-gray-300">
-                      {(row as any)[col.key] ?? ''}
-                    </div>
-                  )}
-                </td>
+              <button 
+                onClick={() => window.location.href = '/enter'}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
+                ODK
+              </button>
+
+              <button 
+                onClick={() => window.location.href = '/enter/defense'}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
+                DEFENSE
+              </button>
+
+              <div className="text-sm flex items-center gap-2 text-zinc-400">
+                {isSaving ? (
+                  <span className="flex items-center gap-1"><Loader2 size={16} className="animate-spin" /> Saving...</span>
+                ) : lastSaved ? (
+                  <span className="flex items-center gap-1 text-emerald-500"><CheckCircle size={16} /> Auto-saved</span>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
+          <table className="w-full border-collapse">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id} className="bg-zinc-950 border-b-2 border-zinc-600 sticky top-0 z-10">
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="px-4 py-4 text-left text-xs font-semibold text-zinc-300 whitespace-nowrap">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                    </th>
+                  ))}
+                </tr>
               ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row, rowIndex) => (
+                <tr key={row.id} className={`border-b border-zinc-800 hover:bg-zinc-800/50 ${selectedCell.row === rowIndex ? 'bg-zinc-800/70' : ''}`}>
+                  {row.getVisibleCells().map((cell, colIndex) => (
+                    <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
+                      <EditableCell
+                        value={cell.getValue()}
+                        rowIndex={rowIndex}
+                        columnId={cell.column.id}
+                        colIndex={colIndex}
+                      />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
-);
-  // ... your JSX unchanged, just ensure supabase null checks are in place
+  );
 }
