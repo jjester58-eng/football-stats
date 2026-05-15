@@ -2,7 +2,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Download, AlertCircle } from 'lucide-react';
-import { useSupabase } from '@/lib/useSupabase';
+import { useSupabase } from '@/types/useSupabase';
 import type { Play } from '@/types/supabase';
 
 interface Column {
