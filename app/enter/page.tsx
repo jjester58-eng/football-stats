@@ -265,6 +265,10 @@ export default function LiveEntry() {
   }, [activeCell]);
 
   const filledRows = rows.filter(r => columns.some(c => c.editable && (r as any)[c.key])).length;
-
+return (
+  <div>
+    ...
+  </div>
+);
   // ... your JSX unchanged, just ensure supabase null checks are in place
 }
