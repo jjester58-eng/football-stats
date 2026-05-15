@@ -86,7 +86,7 @@ export default function LiveEntry() {
   const [error, setError] = useState('');
   const [showCalculations, setShowCalculations] = useState(true);
   const gridRef = useRef<HTMLDivElement>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const columns: Column[] = [
     { key: 'play_number', label: 'PLAY #',   width: 70,  editable: false, type: 'number', group: 'core' },
