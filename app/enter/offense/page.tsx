@@ -85,7 +85,7 @@ export default function OffenseEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // Load Games for Dropdown
+  // Load Games
   useEffect(() => {
     const loadGames = async () => {
       const { data, error } = await supabase
@@ -100,32 +100,32 @@ export default function OffenseEntry() {
     loadGames();
   }, []);
 
-  // Auto Save
+  // Auto Save - Fixed Type Error
   const autoSave = useCallback(async () => {
     if (!selectedGameId) return;
 
     setIsSaving(true);
     try {
       const playsToSave = data.map((play) => ({
-  game_id: selectedGameId,
-  play_number: play.playNumber,
-  down: play.down === '' ? null : play.down,
-  dist: play.dist === '' ? null : play.dist,
-  hash: play.hash,
-  yard_line: play.yardLine === '' ? null : play.yardLine,
-  gnls: play.gnls === '' ? null : play.gnls,
-  off_formation: play.offFormation,
-  motion: play.motion,
-  off_play: play.offPlay,
-  ball_carrier: play.ballCarrier,
-  front: play.front,
-  blitz: play.blitz,
-  coverage: play.coverage,
-}));
+        game_id: selectedGameId,
+        play_number: play.playNumber,
+        down: play.down || null,
+        dist: play.dist || null,
+        hash: play.hash || null,
+        yard_line: play.yardLine || null,
+        gnls: play.gnls || null,
+        off_formation: play.offFormation || null,
+        motion: play.motion || null,
+        off_play: play.offPlay || null,
+        ball_carrier: play.ballCarrier || null,
+        front: play.front || null,
+        blitz: play.blitz || null,
+        coverage: play.coverage || null,
+      }));
 
       const { error } = await supabase
         .from('plays')
-        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
+        .upsert(playsToSave as any, { onConflict: 'game_id,play_number' });
 
       if (error) throw error;
       setLastSaved(new Date());
@@ -189,18 +189,32 @@ export default function OffenseEntry() {
         onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
         onKeyDown={(e) => {
           switch (e.key) {
-            case 'Enter': e.preventDefault(); moveToCell(rowIndex + 1, colIndex); break;
-            case 'Tab': e.preventDefault(); moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1)); break;
-            case 'ArrowDown': e.preventDefault(); moveToCell(rowIndex + 1, colIndex); break;
-            case 'ArrowUp': e.preventDefault(); moveToCell(rowIndex - 1, colIndex); break;
+            case 'Enter':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'Tab':
+              e.preventDefault();
+              moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
+              break;
+            case 'ArrowDown':
+              e.preventDefault();
+              moveToCell(rowIndex + 1, colIndex);
+              break;
+            case 'ArrowUp':
+              e.preventDefault();
+              moveToCell(rowIndex - 1, colIndex);
+              break;
             case 'ArrowRight':
               if (inputRef.current?.selectionStart === inputRef.current?.value.length) {
-                e.preventDefault(); moveToCell(rowIndex, colIndex + 1);
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex + 1);
               }
               break;
             case 'ArrowLeft':
               if (inputRef.current?.selectionStart === 0) {
-                e.preventDefault(); moveToCell(rowIndex, colIndex - 1);
+                e.preventDefault();
+                moveToCell(rowIndex, colIndex - 1);
               }
               break;
           }
@@ -230,7 +244,6 @@ export default function OffenseEntry() {
             </div>
 
             <div className="flex items-center gap-4">
-              {/* Game Selector */}
               <select
                 value={selectedGameId || ''}
                 onChange={(e) => setSelectedGameId(e.target.value)}
@@ -244,13 +257,13 @@ export default function OffenseEntry() {
                 ))}
               </select>
 
-              {/* Navigation Buttons */}
               <button 
                 onClick={() => window.location.href = '/enter'}
                 className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
               >
                 ODK
               </button>
+
               <button 
                 onClick={() => window.location.href = '/enter/defense'}
                 className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
@@ -258,7 +271,6 @@ export default function OffenseEntry() {
                 DEFENSE
               </button>
 
-              {/* Auto-save Status */}
               <div className="text-sm flex items-center gap-2 text-zinc-400">
                 {isSaving ? (
                   <span className="flex items-center gap-1"><Loader2 size={16} className="animate-spin" /> Saving...</span>
@@ -270,7 +282,6 @@ export default function OffenseEntry() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="overflow-x-auto border border-zinc-700 rounded-3xl bg-zinc-900 shadow-xl">
           <table className="w-full border-collapse">
             <thead>
