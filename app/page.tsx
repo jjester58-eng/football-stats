@@ -33,7 +33,7 @@ export default function KangaroosLanding() {
           <div className="mb-16 mt-8">
             <div className="inline-flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-full px-4 py-1.5 text-sm mb-6">
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-              Ready for Game Day
+              Ready for Friday Night
             </div>
             
             <h1 className="text-6xl md:text-7xl font-bold tracking-tighter mb-6">
@@ -44,26 +44,26 @@ export default function KangaroosLanding() {
             </h1>
             
             <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-              Live play-by-play entry • Powerful tendency analysis • Opponent scouting
+              Live play-by-play entry • Smart auto calculations • Opponent scouting
             </p>
           </div>
 
-          {/* Main Action Cards */}
+          {/* Action Cards */}
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             
-            {/* Live Entry Card - Updated to point to main entry */}
+            {/* Live Entry - Main Button */}
             <div className="bg-zinc-900 border border-zinc-700 rounded-3xl p-8 hover:border-blue-500 transition-all group">
               <div className="w-14 h-14 bg-blue-600/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <Play className="w-8 h-8 text-blue-500" />
               </div>
               <h3 className="text-2xl font-semibold mb-3">Live Data Entry</h3>
               <p className="text-zinc-400 mb-8">
-                Enter plays in real-time. Smart auto calculations enabled.
+                Real-time play tracking with automatic down & distance calculations.
               </p>
               
               <button 
-                className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-colors"
                 onClick={() => window.location.href = '/enter'}
+                className="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 transition-colors"
               >
                 START LIVE ENTRY <ArrowRight className="w-5 h-5" />
               </button>
@@ -76,7 +76,7 @@ export default function KangaroosLanding() {
               </div>
               <h3 className="text-2xl font-semibold mb-3">Upload Data</h3>
               <p className="text-zinc-400 mb-8">
-                Import previous games from CSV files for offense and defense.
+                Import CSV files from Hudl or previous games.
               </p>
               
               <button className="w-full bg-white text-black py-4 rounded-2xl font-semibold hover:bg-zinc-200 transition-colors">
@@ -94,23 +94,12 @@ export default function KangaroosLanding() {
               </div>
               <h3 className="text-2xl font-semibold mb-3">Analyze & Scout</h3>
               <p className="text-zinc-400 mb-8">
-                View tendencies, success rates, and scout opponents.
+                View tendencies, success rates, and scout upcoming opponents.
               </p>
               
-              <div className="space-y-4">
-                <div className="relative">
-                  <select className="w-full bg-zinc-800 border border-zinc-700 rounded-2xl py-4 px-5 text-white appearance-none">
-                    <option>Select Opponent</option>
-                    <option>Westside Warriors</option>
-                    <option>Central Tigers</option>
-                    <option>Riverside Rams</option>
-                  </select>
-                </div>
-                
-                <button className="w-full bg-zinc-800 hover:bg-zinc-700 py-4 rounded-2xl font-semibold transition-colors">
-                  View All Logged Games →
-                </button>
-              </div>
+              <button className="w-full bg-zinc-800 hover:bg-zinc-700 py-4 rounded-2xl font-semibold transition-colors">
+                View All Logged Games →
+              </button>
             </div>
           </div>
         </div>
@@ -120,7 +109,6 @@ export default function KangaroosLanding() {
       <div className="bg-zinc-900 border-t border-zinc-800 py-16">
         <div className="max-w-5xl mx-auto px-6">
           <h2 className="text-3xl font-bold mb-8">Recent Games</h2>
-          
           <div className="grid md:grid-cols-3 gap-6">
             {[1,2,3].map((i) => (
               <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 hover:border-zinc-600 transition-colors">

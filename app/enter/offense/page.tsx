@@ -8,7 +8,7 @@ import {
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/types/supabase';
 
 type Game = {
   id: string;
