@@ -240,8 +240,8 @@ export default function LiveEntry() {
 
     setIsStartingNewGame(true);
     try {
-      const { data: game, error } = await supabase
-        .from('games')
+      const { data: game, error } = await (supabase as any)
+  .from('games')
         .insert({ opponent: opponent.trim(), game_date: gameDate, status: 'live' })
         .select()
         .single();
@@ -303,8 +303,8 @@ export default function LiveEntry() {
         coverage: play.coverage,
       }));
 
-      const { error } = await supabase
-        .from('plays')
+      const { error } = await (supabase as any)
+  .from('plays')
         .upsert(playsToSave, { onConflict: 'game_id,play_number' });
 
       if (error) throw error;
