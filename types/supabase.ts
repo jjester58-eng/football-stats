@@ -1,4 +1,3 @@
-
 export type Database = {
   public: {
     Tables: {
@@ -32,9 +31,10 @@ export type Database = {
 }
 
 export type Play = {
-  id: string
+  id?: string
   game_id: string
   play_number: number
+  // enter/page.tsx column names
   odk: string | null
   dn: number | null
   dist: number | null
@@ -52,6 +52,13 @@ export type Play = {
   stunt: string | null
   blitz: string | null
   coverage: string | null
+  // enter/offense/page.tsx column names
+  down: number | null
+  yard_line: number | null
+  gnls: number | null
+  off_formation: string | null
+  ball_carrier: string | null
+  front: string | null
   synced_at: string | null
   created_at?: string
 }

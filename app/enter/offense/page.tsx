@@ -8,7 +8,7 @@ import {
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { supabase } from '@/types/supabase';
+import { supabase } from '@/lib/supabase';
 
 type Game = {
   id: string;
@@ -107,21 +107,21 @@ export default function OffenseEntry() {
     setIsSaving(true);
     try {
       const playsToSave = data.map((play) => ({
-        game_id: selectedGameId,
-        play_number: play.playNumber,
-        down: play.down,
-        dist: play.dist,
-        hash: play.hash,
-        yard_line: play.yardLine,
-        gnls: play.gnls,
-        off_formation: play.offFormation,
-        motion: play.motion,
-        off_play: play.offPlay,
-        ball_carrier: play.ballCarrier,
-        front: play.front,
-        blitz: play.blitz,
-        coverage: play.coverage,
-      }));
+  game_id: selectedGameId,
+  play_number: play.playNumber,
+  down: play.down === '' ? null : play.down,
+  dist: play.dist === '' ? null : play.dist,
+  hash: play.hash,
+  yard_line: play.yardLine === '' ? null : play.yardLine,
+  gnls: play.gnls === '' ? null : play.gnls,
+  off_formation: play.offFormation,
+  motion: play.motion,
+  off_play: play.offPlay,
+  ball_carrier: play.ballCarrier,
+  front: play.front,
+  blitz: play.blitz,
+  coverage: play.coverage,
+}));
 
       const { error } = await supabase
         .from('plays')
