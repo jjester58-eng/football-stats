@@ -8,12 +8,8 @@ import {
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 type NumericField = number | '';
 
 type PlayEntry = {
@@ -38,14 +34,84 @@ type PlayEntry = {
   coverage: string;
 };
 
+function EditableCell({
+  value,
+  rowIndex,
+  columnId,
+  colIndex,
+  isSelected,
+  onSelect,
+  onUpdate,
+  onMove,
+}: {
+  value: any;
+  rowIndex: number;
+  columnId: string;
+  colIndex: number;
+  isSelected: boolean;
+  onSelect: (row: number, col: number) => void;
+  onUpdate: (rowIndex: number, columnId: string, value: any) => void;
+  onMove: (row: number, col: number) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isSelected && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isSelected]);
+
+  return (
+    <input
+      ref={inputRef}
+      value={value ?? ''}
+      onChange={(e) => onUpdate(rowIndex, columnId, e.target.value)}
+      onClick={() => onSelect(rowIndex, colIndex)}
+      onKeyDown={(e) => {
+        switch (e.key) {
+          case 'Enter':
+            e.preventDefault();
+            onMove(rowIndex + 1, colIndex);
+            break;
+          case 'Tab':
+            e.preventDefault();
+            onMove(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
+            break;
+          case 'ArrowDown':
+            e.preventDefault();
+            onMove(rowIndex + 1, colIndex);
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            onMove(rowIndex - 1, colIndex);
+            break;
+          case 'ArrowRight':
+            if (inputRef.current?.selectionStart === inputRef.current?.value.length) {
+              e.preventDefault();
+              onMove(rowIndex, colIndex + 1);
+            }
+            break;
+          case 'ArrowLeft':
+            if (inputRef.current?.selectionStart === 0) {
+              e.preventDefault();
+              onMove(rowIndex, colIndex - 1);
+            }
+            break;
+        }
+      }}
+      className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
+        isSelected ? 'border-blue-500 bg-zinc-800' : 'border-transparent hover:border-zinc-700'
+      }`}
+    />
+  );
+}
+
 export default function LiveEntry() {
   const [opponent, setOpponent] = useState('');
   const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
-
   const [isStartingNewGame, setIsStartingNewGame] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
 
   const [data, setData] = useState<PlayEntry[]>(() => {
@@ -98,7 +164,6 @@ export default function LiveEntry() {
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
-  // Helper Functions
   const toPosition = (val: NumericField): number => {
     if (val === '' || val === null) return 50;
     const n = Number(val);
@@ -170,76 +235,10 @@ export default function LiveEntry() {
     });
   };
 
-  // Editable Cell - Fixed null safety
-  function EditableCell({
-    value,
-    rowIndex,
-    columnId,
-    colIndex,
-  }: {
-    value: any;
-    rowIndex: number;
-    columnId: string;
-    colIndex: number;
-  }) {
-    const isSelected = selectedCell.row === rowIndex && selectedCell.col === colIndex;
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-      if (isSelected && inputRef.current) {
-        inputRef.current.focus();
-      }
-    }, [isSelected]);
-
-    return (
-      <input
-        ref={inputRef}
-        value={value ?? ''}
-        onChange={(e) => updateRow(rowIndex, columnId, e.target.value)}
-        onClick={() => setSelectedCell({ row: rowIndex, col: colIndex })}
-        onKeyDown={(e) => {
-          switch (e.key) {
-            case 'Enter':
-              e.preventDefault();
-              moveToCell(rowIndex + 1, colIndex);
-              break;
-            case 'Tab':
-              e.preventDefault();
-              moveToCell(rowIndex, colIndex + (e.shiftKey ? -1 : 1));
-              break;
-            case 'ArrowDown':
-              e.preventDefault();
-              moveToCell(rowIndex + 1, colIndex);
-              break;
-            case 'ArrowUp':
-              e.preventDefault();
-              moveToCell(rowIndex - 1, colIndex);
-              break;
-            case 'ArrowRight':
-              if (inputRef.current?.selectionStart === inputRef.current?.value.length) {
-                e.preventDefault();
-                moveToCell(rowIndex, colIndex + 1);
-              }
-              break;
-            case 'ArrowLeft':
-              if (inputRef.current?.selectionStart === 0) {
-                e.preventDefault();
-                moveToCell(rowIndex, colIndex - 1);
-              }
-              break;
-          }
-        }}
-        className={`w-full min-h-[38px] px-3 py-1 bg-transparent outline-none border text-center transition-colors ${
-          isSelected ? 'border-blue-500 bg-zinc-800' : 'border-transparent hover:border-zinc-700'
-        }`}
-      />
-    );
-  }
-
   const table = useReactTable({ data, columns, getCoreRowModel: getCoreRowModel() });
 
   const startNewGame = async () => {
-    if (!opponent.trim()) return alert("Please enter an opponent name first.");
+    if (!opponent.trim()) return alert('Please enter an opponent name first.');
     if (!confirm('Start a new game? Current data will be lost.')) return;
 
     setIsStartingNewGame(true);
@@ -253,35 +252,37 @@ export default function LiveEntry() {
       if (error) throw error;
 
       setCurrentGameId(game.id);
-      alert("New game started successfully!");
+      alert('New game started successfully!');
 
-      setData(prev => prev.map((row, i) => ({
-        ...row,
-        down: i === 0 ? 1 : '',
-        dist: i === 0 ? 10 : '',
-        gnls: '',
-        yardLine: i === 0 ? -25 : '',
-        playType: '',
-        result: '',
-        offFormation: '',
-        defense: '',
-        motion: '',
-        offPlay: '',
-        rpo: '',
-        playDir: '',
-        stunt: '',
-        blitz: '',
-        coverage: '',
-      })));
+      setData((prev) =>
+        prev.map((row, i) => ({
+          ...row,
+          down: i === 0 ? 1 : '',
+          dist: i === 0 ? 10 : '',
+          gnls: '',
+          yardLine: i === 0 ? -25 : '',
+          playType: '',
+          result: '',
+          offFormation: '',
+          defense: '',
+          motion: '',
+          offPlay: '',
+          rpo: '',
+          playDir: '',
+          stunt: '',
+          blitz: '',
+          coverage: '',
+        }))
+      );
     } catch (error: any) {
-      alert(error.message || "Failed to create new game");
+      alert(error.message || 'Failed to create new game');
     } finally {
       setIsStartingNewGame(false);
     }
   };
 
   const saveGame = async () => {
-    if (!currentGameId) return alert("Please start a new game first");
+    if (!currentGameId) return alert('Please start a new game first');
 
     setIsSaving(true);
     try {
@@ -312,24 +313,26 @@ export default function LiveEntry() {
         .upsert(playsToSave, { onConflict: 'game_id,play_number' });
 
       if (error) throw error;
-      alert("Game saved successfully!");
+      alert('Game saved successfully!');
     } catch (error: any) {
-      alert(error.message || "Failed to save game");
+      alert(error.message || 'Failed to save game');
     } finally {
       setIsSaving(false);
     }
   };
 
   const downloadCSV = () => {
-    const headers = columns.map(col => col.header as string);
+    const headers = columns.map((col) => col.header as string);
     const csvContent = [
       headers.join(','),
-      ...data.map(row =>
-        columns.map(col => {
-          const val = (row as any)[col.id as keyof PlayEntry];
-          return val !== null && val !== undefined ? `"${val}"` : '';
-        }).join(',')
-      )
+      ...data.map((row) =>
+        columns
+          .map((col) => {
+            const val = (row as any)[col.id as keyof PlayEntry];
+            return val !== null && val !== undefined ? `"${val}"` : '';
+          })
+          .join(',')
+      ),
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -347,20 +350,32 @@ export default function LiveEntry() {
         <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 mb-6">
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex items-center gap-4">
-              <button onClick={() => window.history.back()} className="flex items-center gap-2 text-zinc-400 hover:text-white">
+              <button
+                onClick={() => window.history.back()}
+                className="flex items-center gap-2 text-zinc-400 hover:text-white"
+              >
                 <ArrowLeft size={22} /> Back
               </button>
               <h1 className="text-4xl font-bold">Kangaroos Live Entry</h1>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              <button onClick={() => window.location.href = '/enter'} className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium">
+              <button
+                onClick={() => (window.location.href = '/enter')}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
                 ODK
               </button>
-              <button onClick={() => window.location.href = '/enter/offense'} className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium">
+              <button
+                onClick={() => (window.location.href = '/enter/offense')}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
                 OFFENSE
               </button>
-              <button onClick={() => window.location.href = '/enter/defense'} className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium">
+              <button
+                onClick={() => (window.location.href = '/enter/defense')}
+                className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
+              >
                 DEFENSE
               </button>
 
@@ -388,7 +403,10 @@ export default function LiveEntry() {
                 className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
               />
 
-              <button onClick={downloadCSV} className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl">
+              <button
+                onClick={downloadCSV}
+                className="flex items-center gap-2 bg-zinc-700 hover:bg-zinc-600 px-5 py-2.5 rounded-xl"
+              >
                 <Download size={18} /> CSV
               </button>
 
@@ -419,7 +437,12 @@ export default function LiveEntry() {
             </thead>
             <tbody>
               {table.getRowModel().rows.map((row, rowIndex) => (
-                <tr key={row.id} className={`border-b border-zinc-800 hover:bg-zinc-800/50 ${selectedCell.row === rowIndex ? 'bg-zinc-800/70' : ''}`}>
+                <tr
+                  key={row.id}
+                  className={`border-b border-zinc-800 hover:bg-zinc-800/50 ${
+                    selectedCell.row === rowIndex ? 'bg-zinc-800/70' : ''
+                  }`}
+                >
                   {row.getVisibleCells().map((cell, colIndex) => (
                     <td key={cell.id} className="px-2 py-1 border-r border-zinc-800 last:border-r-0">
                       <EditableCell
@@ -427,6 +450,10 @@ export default function LiveEntry() {
                         rowIndex={rowIndex}
                         columnId={cell.column.id}
                         colIndex={colIndex}
+                        isSelected={selectedCell.row === rowIndex && selectedCell.col === colIndex}
+                        onSelect={(r, c) => setSelectedCell({ row: r, col: c })}
+                        onUpdate={updateRow}
+                        onMove={moveToCell}
                       />
                     </td>
                   ))}
