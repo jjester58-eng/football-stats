@@ -8,8 +8,12 @@ import {
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 type NumericField = number | '';
 
 type PlayEntry = {
@@ -240,8 +244,8 @@ export default function LiveEntry() {
 
     setIsStartingNewGame(true);
     try {
-      const { data: game, error } = await (supabase as any)
-  .from('games')
+      const { data: game, error } = await supabase
+        .from('games')
         .insert({ opponent: opponent.trim(), game_date: gameDate, status: 'live' })
         .select()
         .single();
@@ -303,8 +307,8 @@ export default function LiveEntry() {
         coverage: play.coverage,
       }));
 
-      const { error } = await (supabase as any)
-  .from('plays')
+      const { error } = await supabase
+        .from('plays')
         .upsert(playsToSave, { onConflict: 'game_id,play_number' });
 
       if (error) throw error;
