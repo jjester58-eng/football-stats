@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Play, Download, Save, Loader2 } from 'lucide-react';
 import {
@@ -7,7 +9,6 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import { supabase } from '@/lib/supabase';
-import { useLocation } from 'wouter';
 
 type NumericField = number | '';
 
@@ -105,32 +106,13 @@ function EditableCell({
   );
 }
 
-type Game = {
-  id: string;
-  opponent: string;
-  game_date: string;
-};
-
 export default function LiveEntry() {
-  const [, navigate] = useLocation();
-  const [games, setGames] = useState<Game[]>([]);
   const [opponent, setOpponent] = useState('');
   const [gameDate, setGameDate] = useState(new Date().toISOString().split('T')[0]);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [isStartingNewGame, setIsStartingNewGame] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
-
-  useEffect(() => {
-    const loadGames = async () => {
-      const { data, error } = await supabase
-        .from('games')
-        .select('id, opponent, game_date')
-        .order('game_date', { ascending: false });
-      if (!error) setGames(data || []);
-    };
-    loadGames();
-  }, []);
 
   const [data, setData] = useState<PlayEntry[]>(() => {
     const rows: PlayEntry[] = [];
@@ -369,7 +351,7 @@ export default function LiveEntry() {
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => window.history.back()}
                 className="flex items-center gap-2 text-zinc-400 hover:text-white"
               >
                 <ArrowLeft size={22} /> Back
@@ -378,33 +360,20 @@ export default function LiveEntry() {
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              <select
-                value={currentGameId || ''}
-                onChange={(e) => setCurrentGameId(e.target.value || null)}
-                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500"
-              >
-                <option value="">Select Game...</option>
-                {games.map((game) => (
-                  <option key={game.id} value={game.id}>
-                    {game.opponent} — {new Date(game.game_date).toLocaleDateString()}
-                  </option>
-                ))}
-              </select>
-
               <button
-                onClick={() => navigate('/enter')}
+                onClick={() => (window.location.href = '/enter')}
                 className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
               >
                 ODK
               </button>
               <button
-                onClick={() => navigate('/enter/offense')}
+                onClick={() => (window.location.href = '/enter/offense')}
                 className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
               >
                 OFFENSE
               </button>
               <button
-                onClick={() => navigate('/enter/defense')}
+                onClick={() => (window.location.href = '/enter/defense')}
                 className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm font-medium"
               >
                 DEFENSE
