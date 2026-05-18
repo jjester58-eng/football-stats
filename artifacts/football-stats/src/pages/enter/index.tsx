@@ -22,11 +22,12 @@ type PlayEntry = {
   playType: string;
   result: string;
   offFormation: string;
-  defense: string;
-  motion: string;
   offPlay: string;
-  rpo: string;
+  motion: string;
   playDir: string;
+  ballCarrier: string;
+  defFront: string;
+  stunt: string;
   blitz: string;
   coverage: string;
 };
@@ -148,11 +149,12 @@ export default function LiveEntry() {
         playType: '',
         result: '',
         offFormation: '',
-        defense: '',
-        motion: '',
         offPlay: '',
-        rpo: '',
+        motion: '',
         playDir: '',
+        ballCarrier: '',
+        defFront: '',
+        stunt: '',
         blitz: '',
         coverage: '',
       });
@@ -171,13 +173,14 @@ export default function LiveEntry() {
     columnHelper.accessor('gnls', { header: 'GN/LS' }),
     columnHelper.accessor('yardLine', { header: 'YARD LN' }),
     columnHelper.accessor('playType', { header: 'PLAY TYPE' }),
-    columnHelper.accessor('result', { header: 'Result' }),
+    columnHelper.accessor('result', { header: 'RESULT' }),
     columnHelper.accessor('offFormation', { header: 'OFF FORM' }),
-    columnHelper.accessor('defense', { header: 'Defense' }),
-    columnHelper.accessor('motion', { header: 'Motion' }),
     columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
-    columnHelper.accessor('rpo', { header: 'RPO' }),
+    columnHelper.accessor('motion', { header: 'MOTION' }),
     columnHelper.accessor('playDir', { header: 'PLAY DIR' }),
+    columnHelper.accessor('ballCarrier', { header: 'BALL CAR' }),
+    columnHelper.accessor('defFront', { header: 'DEF FRON' }),
+    columnHelper.accessor('stunt', { header: 'STUNT' }),
     columnHelper.accessor('blitz', { header: 'BLITZ' }),
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
@@ -209,11 +212,12 @@ export default function LiveEntry() {
               playType: p.play_type ?? '',
               result: p.result ?? '',
               offFormation: p.off_formation ?? '',
-              defense: p.defense ?? '',
-              motion: p.motion ?? '',
               offPlay: p.off_play ?? '',
-              rpo: p.rpo ?? '',
+              motion: p.motion ?? '',
               playDir: p.play_dir ?? '',
+              ballCarrier: p.ball_carrier ?? '',
+              defFront: p.front ?? '',
+              stunt: p.defense ?? '',
               blitz: p.blitz ?? '',
               coverage: p.coverage ?? '',
             };
@@ -245,11 +249,12 @@ export default function LiveEntry() {
     play_type: play.playType || null,
     result: play.result || null,
     off_formation: play.offFormation || null,
-    defense: play.defense || null,
-    motion: play.motion || null,
     off_play: play.offPlay || null,
-    rpo: play.rpo || null,
+    motion: play.motion || null,
     play_dir: play.playDir || null,
+    ball_carrier: play.ballCarrier || null,
+    front: play.defFront || null,
+    defense: play.stunt || null,
     blitz: play.blitz || null,
     coverage: play.coverage || null,
   }), [currentGameId]);
@@ -258,9 +263,9 @@ export default function LiveEntry() {
     playIdsRef.current.has(play.playNumber) ||
     play.down !== '' || play.dist !== '' || play.hash !== '' ||
     play.gnls !== '' || play.yardLine !== '' || play.playType !== '' ||
-    play.result !== '' || play.offFormation !== '' || play.defense !== '' ||
-    play.motion !== '' || play.offPlay !== '' || play.rpo !== '' ||
-    play.playDir !== '' || play.blitz !== '' || play.coverage !== '';
+    play.result !== '' || play.offFormation !== '' || play.offPlay !== '' ||
+    play.motion !== '' || play.playDir !== '' || play.ballCarrier !== '' ||
+    play.defFront !== '' || play.stunt !== '' || play.blitz !== '' || play.coverage !== '';
 
   const autoSave = useCallback(async () => {
     if (!currentGameId) return;
@@ -395,11 +400,12 @@ export default function LiveEntry() {
           playType: '',
           result: '',
           offFormation: '',
-          defense: '',
-          motion: '',
           offPlay: '',
-          rpo: '',
+          motion: '',
           playDir: '',
+          ballCarrier: '',
+          defFront: '',
+          stunt: '',
           blitz: '',
           coverage: '',
         }))

@@ -22,15 +22,15 @@ const COL_MAP: Record<string, keyof ParsedPlay> = {
   'play type': 'play_type', 'play_type': 'play_type', 'type': 'play_type',
   'result': 'result',
   'off form': 'off_formation', 'off formation': 'off_formation', 'off_formation': 'off_formation', 'formation': 'off_formation',
-  'defense': 'defense',
+  'off play': 'off_play', 'off_play': 'off_play',
   'motion': 'motion',
-  'off play': 'off_play', 'off_play': 'off_play', 'play': 'off_play',
-  'rpo': 'rpo',
   'play dir': 'play_dir', 'play_dir': 'play_dir', 'direction': 'play_dir',
+  'ball car': 'ball_carrier', 'ball carrier': 'ball_carrier', 'ball_carrier': 'ball_carrier', 'carrier': 'ball_carrier',
+  'def fron': 'front', 'def front': 'front', 'defensive front': 'front', 'front': 'front',
+  'stunt': 'defense', 'defense': 'defense',
   'blitz': 'blitz',
   'coverage': 'coverage',
-  'ball carrier': 'ball_carrier', 'ball_carrier': 'ball_carrier', 'carrier': 'ball_carrier',
-  'front': 'front',
+  'rpo': 'rpo',
 };
 
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -67,10 +67,10 @@ function rowToPlay(row: string[], colMap: Record<number, keyof ParsedPlay>): Par
   return play;
 }
 
-const TEMPLATE_CSV = `PLAY #,ODK,DN,DIST,HASH,GN/LS,YARD LN,PLAY TYPE,Result,OFF FORM,Defense,Motion,OFF PLAY,RPO,PLAY DIR,BLITZ,COVERAGE,BALL CARRIER,FRONT
-1,O,1,10,M,,25,Run,6,Gun Spread,,,Zone Read,N,R,,,Jones,
-2,D,1,10,M,,-25,Pass,,-,,3-4,Man,,,,MLB,,3-4
-3,O,2,4,R,,,Pass,,Shotgun,,,Slant,N,M,,,,`;
+const TEMPLATE_CSV = `PLAY #,ODK,DN,DIST,HASH,GN/LS,YARD LN,PLAY TYPE,RESULT,OFF FORM,OFF PLAY,MOTION,PLAY DIR,BALL CAR,DEF FRON,STUNT,BLITZ,COVERAGE
+1,O,1,10,M,,25,Run,6,Gun Spread,Zone Read,,R,Jones,,,, 
+2,D,1,10,M,,-25,Pass,,,,,,,,3-4,,Cover 3
+3,O,2,4,R,,,Pass,,Shotgun,Slant,,M,,,,, `;
 
 export default function UploadPage() {
   const [, navigate] = useLocation();
@@ -176,7 +176,7 @@ export default function UploadPage() {
     }
   };
 
-  const previewCols: (keyof ParsedPlay)[] = ['play_number','odk','down','dist','hash','yard_line','play_type','off_formation','blitz','coverage','front'];
+  const previewCols: (keyof ParsedPlay)[] = ['play_number','odk','down','dist','hash','gnls','yard_line','play_type','result','off_formation','off_play','motion','play_dir','ball_carrier','front','defense','blitz','coverage'];
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-6">
@@ -270,13 +270,13 @@ export default function UploadPage() {
           <p className="text-sm text-zinc-400 mb-3">Column headers are matched automatically — use any of these names (case-insensitive):</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-xs">
             {[
-              ['Play #', 'play_number, #'], ['ODK', 'odk'], ['DN', 'down, DN'],
+              ['PLAY #', 'play_number, #'], ['ODK', 'odk'], ['DN', 'down'],
               ['DIST', 'dist, distance'], ['HASH', 'hash'], ['GN/LS', 'gnls, gain/loss'],
-              ['YARD LN', 'yard_line, yard line'], ['PLAY TYPE', 'play_type, type'], ['Result', 'result'],
-              ['OFF FORM', 'off_formation, formation'], ['Defense', 'defense'], ['Motion', 'motion'],
-              ['OFF PLAY', 'off_play, play'], ['RPO', 'rpo'], ['PLAY DIR', 'play_dir, direction'],
-              ['BLITZ', 'blitz'], ['COVERAGE', 'coverage'], ['BALL CARRIER', 'ball_carrier'],
-              ['FRONT', 'front'],
+              ['YARD LN', 'yard_line, yard line'], ['PLAY TYPE', 'play_type, type'], ['RESULT', 'result'],
+              ['OFF FORM', 'off_formation, formation'], ['OFF PLAY', 'off_play'], ['MOTION', 'motion'],
+              ['PLAY DIR', 'play_dir, direction'], ['BALL CAR', 'ball carrier, ball_carrier'],
+              ['DEF FRON', 'def front, defensive front, front'], ['STUNT', 'stunt, defense'],
+              ['BLITZ', 'blitz'], ['COVERAGE', 'coverage'],
             ].map(([label, vals]) => (
               <div key={label} className="bg-zinc-800 rounded-lg px-3 py-2">
                 <div className="text-zinc-200 font-medium">{label}</div>
