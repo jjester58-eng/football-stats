@@ -5,6 +5,8 @@ import Home from "@/pages/home";
 import LiveEntry from "@/pages/enter/index";
 import OffenseEntry from "@/pages/enter/offense/index";
 import DefenseEntry from "@/pages/enter/defense/index";
+import AnalyzePage from "@/pages/analyze/index";
+import UploadPage from "@/pages/upload/index";
 
 const queryClient = new QueryClient();
 
@@ -15,6 +17,8 @@ function Router() {
       <Route path="/enter" component={LiveEntry} />
       <Route path="/enter/offense" component={OffenseEntry} />
       <Route path="/enter/defense" component={DefenseEntry} />
+      <Route path="/analyze" component={AnalyzePage} />
+      <Route path="/upload" component={UploadPage} />
       <Route component={NotFound} />
     </Switch>
   );
