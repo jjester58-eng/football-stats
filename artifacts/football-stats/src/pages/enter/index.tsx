@@ -12,7 +12,6 @@ import { useLocation } from 'wouter';
 type NumericField = number | '';
 
 type PlayEntry = {
-  id?: string;
   playNumber: number;
   odk: string;
   down: NumericField;
@@ -28,7 +27,6 @@ type PlayEntry = {
   offPlay: string;
   rpo: string;
   playDir: string;
-  stunt: string;
   blitz: string;
   coverage: string;
 };
@@ -119,9 +117,11 @@ export default function LiveEntry() {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [isStartingNewGame, setIsStartingNewGame] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playIdsRef = useRef<Map<number, string>>(new Map());
 
   useEffect(() => {
     const loadGames = async () => {
@@ -153,7 +153,6 @@ export default function LiveEntry() {
         offPlay: '',
         rpo: '',
         playDir: '',
-        stunt: '',
         blitz: '',
         coverage: '',
       });
@@ -179,47 +178,109 @@ export default function LiveEntry() {
     columnHelper.accessor('offPlay', { header: 'OFF PLAY' }),
     columnHelper.accessor('rpo', { header: 'RPO' }),
     columnHelper.accessor('playDir', { header: 'PLAY DIR' }),
-    columnHelper.accessor('stunt', { header: 'STUNT' }),
     columnHelper.accessor('blitz', { header: 'BLITZ' }),
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
 
+  const loadPlays = useCallback(async (gameId: string) => {
+    setIsLoading(true);
+    try {
+      const { data: plays, error } = await supabase
+        .from('plays')
+        .select('*')
+        .eq('game_id', gameId)
+        .order('play_number');
+      if (error) throw error;
+      playIdsRef.current = new Map();
+      plays.forEach((p) => playIdsRef.current.set(p.play_number, p.id));
+      setData((prev) => {
+        const next = [...prev];
+        plays.forEach((p) => {
+          const idx = p.play_number - 1;
+          if (idx >= 0 && idx < next.length) {
+            next[idx] = {
+              playNumber: p.play_number,
+              odk: p.odk ?? next[idx].odk,
+              down: p.down ?? '',
+              dist: p.dist ?? '',
+              hash: p.hash ?? '',
+              gnls: p.gnls ?? '',
+              yardLine: p.yard_line ?? '',
+              playType: p.play_type ?? '',
+              result: p.result ?? '',
+              offFormation: p.off_formation ?? '',
+              defense: p.defense ?? '',
+              motion: p.motion ?? '',
+              offPlay: p.off_play ?? '',
+              rpo: p.rpo ?? '',
+              playDir: p.play_dir ?? '',
+              blitz: p.blitz ?? '',
+              coverage: p.coverage ?? '',
+            };
+          }
+        });
+        return next;
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentGameId) loadPlays(currentGameId);
+  }, [currentGameId, loadPlays]);
+
+  const buildPayload = useCallback((play: PlayEntry) => ({
+    ...(playIdsRef.current.has(play.playNumber) ? { id: playIdsRef.current.get(play.playNumber) } : {}),
+    game_id: currentGameId,
+    play_number: play.playNumber,
+    odk: play.odk,
+    down: play.down || null,
+    dist: play.dist || null,
+    hash: play.hash || null,
+    gnls: play.gnls || null,
+    yard_line: play.yardLine || null,
+    play_type: play.playType || null,
+    result: play.result || null,
+    off_formation: play.offFormation || null,
+    defense: play.defense || null,
+    motion: play.motion || null,
+    off_play: play.offPlay || null,
+    rpo: play.rpo || null,
+    play_dir: play.playDir || null,
+    blitz: play.blitz || null,
+    coverage: play.coverage || null,
+  }), [currentGameId]);
+
+  const hasData = (play: PlayEntry) =>
+    playIdsRef.current.has(play.playNumber) ||
+    play.down !== '' || play.dist !== '' || play.hash !== '' ||
+    play.gnls !== '' || play.yardLine !== '' || play.playType !== '' ||
+    play.result !== '' || play.offFormation !== '' || play.defense !== '' ||
+    play.motion !== '' || play.offPlay !== '' || play.rpo !== '' ||
+    play.playDir !== '' || play.blitz !== '' || play.coverage !== '';
+
   const autoSave = useCallback(async () => {
     if (!currentGameId) return;
+    const playsToSave = data.filter(hasData).map(buildPayload);
+    if (playsToSave.length === 0) return;
     setIsSaving(true);
     try {
-      const playsToSave = data.map((play) => ({
-        game_id: currentGameId,
-        play_number: play.playNumber,
-        odk: play.odk,
-        down: play.down || null,
-        dist: play.dist || null,
-        hash: play.hash || null,
-        gnls: play.gnls || null,
-        yard_line: play.yardLine || null,
-        play_type: play.playType || null,
-        result: play.result || null,
-        off_formation: play.offFormation || null,
-        defense: play.defense || null,
-        motion: play.motion || null,
-        off_play: play.offPlay || null,
-        rpo: play.rpo || null,
-        play_dir: play.playDir || null,
-        stunt: play.stunt || null,
-        blitz: play.blitz || null,
-        coverage: play.coverage || null,
-      }));
-      const { error } = await supabase
+      const { data: saved, error } = await supabase
         .from('plays')
-        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
+        .upsert(playsToSave)
+        .select('id, play_number');
       if (error) throw error;
+      saved?.forEach((row) => playIdsRef.current.set(row.play_number, row.id));
       setLastSaved(new Date());
     } catch (error) {
       console.error(error);
     } finally {
       setIsSaving(false);
     }
-  }, [currentGameId, data]);
+  }, [currentGameId, data, buildPayload]);
 
   const triggerAutoSave = useCallback(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -323,6 +384,7 @@ export default function LiveEntry() {
       setCurrentGameId(game.id);
       alert('New game started successfully!');
 
+      playIdsRef.current = new Map();
       setData((prev) =>
         prev.map((row, i) => ({
           ...row,
@@ -338,7 +400,6 @@ export default function LiveEntry() {
           offPlay: '',
           rpo: '',
           playDir: '',
-          stunt: '',
           blitz: '',
           coverage: '',
         }))
@@ -352,42 +413,7 @@ export default function LiveEntry() {
 
   const saveGame = async () => {
     if (!currentGameId) return alert('Please start a new game first');
-
-    setIsSaving(true);
-    try {
-      const playsToSave = data.map((play) => ({
-        game_id: currentGameId,
-        play_number: play.playNumber,
-        odk: play.odk,
-        down: play.down,
-        dist: play.dist,
-        hash: play.hash,
-        gnls: play.gnls,
-        yard_line: play.yardLine,
-        play_type: play.playType,
-        result: play.result,
-        off_formation: play.offFormation,
-        defense: play.defense,
-        motion: play.motion,
-        off_play: play.offPlay,
-        rpo: play.rpo,
-        play_dir: play.playDir,
-        stunt: play.stunt,
-        blitz: play.blitz,
-        coverage: play.coverage,
-      }));
-
-      const { error } = await supabase
-        .from('plays')
-        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
-
-      if (error) throw error;
-      alert('Game saved successfully!');
-    } catch (error: any) {
-      alert(error.message || 'Failed to save game');
-    } finally {
-      setIsSaving(false);
-    }
+    await autoSave();
   };
 
   const downloadCSV = () => {
