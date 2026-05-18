@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Play, Download, Save, Loader2 } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowLeft, Play, Download, Save, Loader2, CheckCircle } from 'lucide-react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -119,7 +119,9 @@ export default function LiveEntry() {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [isStartingNewGame, setIsStartingNewGame] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [selectedCell, setSelectedCell] = useState({ row: 0, col: 0 });
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const loadGames = async () => {
@@ -181,6 +183,55 @@ export default function LiveEntry() {
     columnHelper.accessor('blitz', { header: 'BLITZ' }),
     columnHelper.accessor('coverage', { header: 'COVERAGE' }),
   ];
+
+  const autoSave = useCallback(async () => {
+    if (!currentGameId) return;
+    setIsSaving(true);
+    try {
+      const playsToSave = data.map((play) => ({
+        game_id: currentGameId,
+        play_number: play.playNumber,
+        odk: play.odk,
+        down: play.down || null,
+        dist: play.dist || null,
+        hash: play.hash || null,
+        gnls: play.gnls || null,
+        yard_line: play.yardLine || null,
+        play_type: play.playType || null,
+        result: play.result || null,
+        off_formation: play.offFormation || null,
+        defense: play.defense || null,
+        motion: play.motion || null,
+        off_play: play.offPlay || null,
+        rpo: play.rpo || null,
+        play_dir: play.playDir || null,
+        stunt: play.stunt || null,
+        blitz: play.blitz || null,
+        coverage: play.coverage || null,
+      }));
+      const { error } = await supabase
+        .from('plays')
+        .upsert(playsToSave, { onConflict: 'game_id,play_number' });
+      if (error) throw error;
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [currentGameId, data]);
+
+  const triggerAutoSave = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(autoSave, 2000);
+  }, [autoSave]);
+
+  useEffect(() => {
+    if (currentGameId) triggerAutoSave();
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [data, currentGameId, triggerAutoSave]);
 
   const toPosition = (val: NumericField): number => {
     if (val === '' || val === null) return 50;
@@ -441,14 +492,15 @@ export default function LiveEntry() {
                 <Download size={18} /> CSV
               </button>
 
-              <button
-                onClick={saveGame}
-                disabled={isSaving || !currentGameId}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 px-6 py-2.5 rounded-xl font-semibold transition"
-              >
-                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                {isSaving ? 'Saving...' : 'Save Game'}
-              </button>
+              <div className="text-sm flex items-center gap-2 text-zinc-400 min-w-[110px]">
+                {isSaving ? (
+                  <span className="flex items-center gap-1"><Loader2 size={16} className="animate-spin" /> Saving...</span>
+                ) : lastSaved ? (
+                  <span className="flex items-center gap-1 text-emerald-500"><CheckCircle size={16} /> Auto-saved</span>
+                ) : currentGameId ? (
+                  <span className="text-zinc-500 text-xs">Edits auto-save</span>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
