@@ -212,7 +212,6 @@ export default function AnalyzePage() {
   const [, navigate] = useLocation();
   const [games, setGames] = useState<Game[]>([]);
   const [loadingGames, setLoadingGames] = useState(true);
-  const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const [selectedGameIds, setSelectedGameIds] = useState<Set<string>>(new Set());
   const [plays, setPlays] = useState<Play[]>([]);
   const [loadingPlays, setLoadingPlays] = useState(false);
@@ -224,15 +223,13 @@ export default function AnalyzePage() {
       .then(({ data }) => { setGames(data || []); setLoadingGames(false); });
   }, []);
 
-  const opponents = Array.from(new Set(games.map(g => g.opponent))).sort();
-
-  const opponentGames = games.filter(g => g.opponent === selectedOpponent);
-
-  const handleOpponentChange = (opp: string) => {
-    setSelectedOpponent(opp);
-    setSelectedGameIds(new Set());
-    setPlays([]);
-  };
+  // Group all games by opponent
+  const gamesByOpponent = games.reduce<Record<string, Game[]>>((acc, g) => {
+    if (!acc[g.opponent]) acc[g.opponent] = [];
+    acc[g.opponent].push(g);
+    return acc;
+  }, {});
+  const opponents = Object.keys(gamesByOpponent).sort();
 
   const toggleGame = (id: string) => {
     setSelectedGameIds(prev => {
@@ -242,7 +239,24 @@ export default function AnalyzePage() {
     });
   };
 
-  const selectAll = () => setSelectedGameIds(new Set(opponentGames.map(g => g.id)));
+  const selectOpponentAll = (opp: string) => {
+    setSelectedGameIds(prev => {
+      const next = new Set(prev);
+      (gamesByOpponent[opp] || []).forEach(g => next.add(g.id));
+      return next;
+    });
+  };
+
+  const clearOpponent = (opp: string) => {
+    setSelectedGameIds(prev => {
+      const next = new Set(prev);
+      (gamesByOpponent[opp] || []).forEach(g => next.delete(g.id));
+      return next;
+    });
+  };
+
+  const selectAllGames = () => setSelectedGameIds(new Set(games.map(g => g.id)));
+  const clearAll = () => { setSelectedGameIds(new Set()); setPlays([]); };
 
   const loadPlays = useCallback(async () => {
     if (selectedGameIds.size === 0) { setPlays([]); return; }
@@ -254,8 +268,10 @@ export default function AnalyzePage() {
 
   useEffect(() => { loadPlays(); }, [loadPlays]);
 
-  const scoutedIds = new Set(opponentGames.filter(g => g.status === 'scouted').map(g => g.id));
-  const liveIds = new Set(opponentGames.filter(g => g.status === 'live').map(g => g.id));
+  // Derive scouted vs live from selected game ids
+  const selectedGames = games.filter(g => selectedGameIds.has(g.id));
+  const scoutedIds = new Set(selectedGames.filter(g => g.status === 'scouted').map(g => g.id));
+  const liveIds = new Set(selectedGames.filter(g => g.status === 'live').map(g => g.id));
 
   const scoutedPlays = plays.filter(p => scoutedIds.has(p.game_id));
   const currentPlays = plays.filter(p => liveIds.has(p.game_id));
@@ -292,94 +308,110 @@ export default function AnalyzePage() {
               <ArrowLeft size={20} /> Home
             </button>
             <h1 className="text-2xl font-bold">Analyze & Scout</h1>
-          </div>
-
-          {/* Opponent selector */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {loadingGames ? <Loader2 size={18} className="animate-spin text-zinc-400" /> : (
-              <select
-                value={selectedOpponent}
-                onChange={e => handleOpponentChange(e.target.value)}
-                className="bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
-              >
-                <option value="">Select Opponent...</option>
-                {opponents.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            )}
-
-            {/* View mode */}
-            {selectedOpponent && (
-              <div className="flex bg-zinc-800 rounded-xl p-1 gap-1">
-                {(['all','scouted','current','compare'] as const).map(m => (
-                  <button key={m} onClick={() => setViewMode(m)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition capitalize ${viewMode === m ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-white'}`}>
-                    {m === 'compare' ? 'Compare' : m === 'current' ? 'Current Game' : m === 'scouted' ? 'Scouted' : 'All Games'}
-                  </button>
-                ))}
-              </div>
+            {selectedGameIds.size > 0 && (
+              <span className="text-sm text-zinc-400">{selectedGameIds.size} game{selectedGameIds.size !== 1 ? 's' : ''} selected · {plays.length} plays</span>
             )}
           </div>
+
+          {/* View mode — shown as soon as games are selected */}
+          {selectedGameIds.size > 0 && (
+            <div className="flex bg-zinc-800 rounded-xl p-1 gap-1">
+              {(['all','scouted','current','compare'] as const).map(m => (
+                <button key={m} onClick={() => setViewMode(m)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${viewMode === m ? 'bg-blue-600 text-white' : 'text-zinc-400 hover:text-white'}`}>
+                  {m === 'compare' ? 'Compare' : m === 'current' ? 'Current Game' : m === 'scouted' ? 'Scouted' : 'All Games'}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6 flex gap-6">
-        {/* Left sidebar: game selector */}
-        {selectedOpponent && (
-          <div className="w-64 shrink-0">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Games</h3>
-                <button onClick={selectAll} className="text-xs text-blue-400 hover:text-blue-300">Select All</button>
+        {/* Left sidebar: all games grouped by opponent */}
+        <div className="w-64 shrink-0">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm">Select Games</h3>
+              <div className="flex gap-2">
+                <button onClick={selectAllGames} className="text-xs text-blue-400 hover:text-blue-300">All</button>
+                <span className="text-zinc-700">·</span>
+                <button onClick={clearAll} className="text-xs text-zinc-500 hover:text-zinc-300">Clear</button>
               </div>
-              {opponentGames.length === 0 ? (
-                <p className="text-zinc-500 text-sm">No games found for this opponent.</p>
-              ) : (
-                <div className="space-y-2">
-                  {opponentGames.map(g => (
-                    <label key={g.id} className="flex items-start gap-3 cursor-pointer group">
-                      <input type="checkbox" checked={selectedGameIds.has(g.id)} onChange={() => toggleGame(g.id)}
-                        className="mt-0.5 accent-blue-500" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm text-zinc-200 truncate">{new Date(g.game_date).toLocaleDateString()}</div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${g.status === 'scouted' ? 'bg-purple-500/20 text-purple-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                          {g.status === 'scouted' ? '📹 Scouted' : '🟢 Live'}
-                        </span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* Summary */}
-            {plays.length > 0 && (
-              <div className="mt-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2 text-sm">
-                <div className="flex justify-between text-zinc-400"><span>Total plays</span><span className="text-white font-medium">{displayPlays.length}</span></div>
-                <div className="flex justify-between text-zinc-400"><span>O plays</span><span className="text-blue-400 font-medium">{oPlays.length}</span></div>
-                <div className="flex justify-between text-zinc-400"><span>D plays</span><span className="text-emerald-400 font-medium">{dPlays.length}</span></div>
-                {viewMode === 'compare' && (
-                  <>
-                    <hr className="border-zinc-800" />
-                    <div className="flex justify-between text-zinc-400"><span>Scouted plays</span><span className="text-purple-400 font-medium">{scoutedPlays.length}</span></div>
-                    <div className="flex justify-between text-zinc-400"><span>Current game</span><span className="text-emerald-400 font-medium">{currentPlays.length}</span></div>
-                  </>
-                )}
+            {loadingGames ? (
+              <div className="flex items-center gap-2 text-zinc-500 text-sm py-2"><Loader2 size={14} className="animate-spin" /> Loading...</div>
+            ) : games.length === 0 ? (
+              <p className="text-zinc-500 text-sm">No games found. Upload scouted game data first.</p>
+            ) : (
+              <div className="space-y-4">
+                {opponents.map(opp => {
+                  const oppGames = gamesByOpponent[opp];
+                  const allSelected = oppGames.every(g => selectedGameIds.has(g.id));
+                  const someSelected = oppGames.some(g => selectedGameIds.has(g.id));
+                  return (
+                    <div key={opp}>
+                      {/* Opponent header */}
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-zinc-300 uppercase tracking-wider truncate">{opp}</span>
+                        <button
+                          onClick={() => allSelected ? clearOpponent(opp) : selectOpponentAll(opp)}
+                          className={`text-xs shrink-0 ml-2 ${allSelected ? 'text-blue-400' : someSelected ? 'text-blue-500/70' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                          {allSelected ? 'Clear' : 'All'}
+                        </button>
+                      </div>
+                      {/* Games */}
+                      <div className="space-y-1.5 pl-1">
+                        {oppGames.map(g => (
+                          <label key={g.id} className="flex items-center gap-2.5 cursor-pointer group">
+                            <input
+                              type="checkbox"
+                              checked={selectedGameIds.has(g.id)}
+                              onChange={() => toggleGame(g.id)}
+                              className="accent-blue-500 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                              <span className="text-sm text-zinc-200 truncate">{new Date(g.game_date).toLocaleDateString()}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full shrink-0 ${g.status === 'scouted' ? 'bg-purple-500/20 text-purple-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                {g.status === 'scouted' ? '📹' : '🟢'}
+                              </span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
-        )}
+
+          {/* Summary */}
+          {selectedGameIds.size > 0 && plays.length > 0 && (
+            <div className="mt-3 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-2 text-sm">
+              <div className="flex justify-between text-zinc-400"><span>Total plays</span><span className="text-white font-medium">{displayPlays.length}</span></div>
+              <div className="flex justify-between text-zinc-400"><span>O plays</span><span className="text-blue-400 font-medium">{oPlays.length}</span></div>
+              <div className="flex justify-between text-zinc-400"><span>D plays</span><span className="text-emerald-400 font-medium">{dPlays.length}</span></div>
+              {viewMode === 'compare' && (
+                <>
+                  <hr className="border-zinc-800" />
+                  <div className="flex justify-between text-zinc-400"><span>Scouted plays</span><span className="text-purple-400 font-medium">{scoutedPlays.length}</span></div>
+                  <div className="flex justify-between text-zinc-400"><span>Current game</span><span className="text-emerald-400 font-medium">{currentPlays.length}</span></div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          {!selectedOpponent ? (
+          {selectedGameIds.size === 0 ? (
             <div className="text-center py-24 text-zinc-500">
               <BarChart3Icon className="w-12 h-12 mx-auto mb-4 opacity-30" />
-              <p className="text-lg">Select an opponent to begin analysis</p>
-              <p className="text-sm mt-2">Load scouted games to see tendencies and trends</p>
-            </div>
-          ) : selectedGameIds.size === 0 ? (
-            <div className="text-center py-24 text-zinc-500">
               <p className="text-lg">Select games from the left panel</p>
+              <p className="text-sm mt-2">Check one or more games to analyze their tendencies</p>
             </div>
           ) : loadingPlays ? (
             <div className="text-center py-24 text-zinc-400 flex items-center justify-center gap-2">
