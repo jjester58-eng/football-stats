@@ -59,7 +59,7 @@ function isBlitz(p: Play) {
 interface OffSitStat {
   situation: string; count: number;
   topFormation: string; formationPct: number;
-  passPct: number; motionPct: number;
+  runPct: number; passPct: number;
 }
 function getOffSituationalStats(plays: Play[]): OffSitStat[] {
   return SITUATIONS.map(sit => {
@@ -68,11 +68,12 @@ function getOffSituationalStats(plays: Play[]): OffSitStat[] {
     const formCounts: Record<string, number> = {};
     sp.forEach(p => { if (p.off_formation?.trim()) { const f = p.off_formation.trim(); formCounts[f] = (formCounts[f] || 0) + 1; } });
     const topEntry = Object.entries(formCounts).sort((a, b) => b[1] - a[1])[0];
+    const passCount = sp.filter(isPass).length;
     return {
       situation: sit, count: sp.length,
       topFormation: topEntry?.[0] || '—', formationPct: pct(topEntry?.[1] || 0, sp.length),
-      passPct: pct(sp.filter(isPass).length, sp.length),
-      motionPct: pct(sp.filter(p => p.motion?.trim()).length, sp.length),
+      passPct: pct(passCount, sp.length),
+      runPct: pct(sp.length - passCount, sp.length),
     };
   }).filter(Boolean) as OffSitStat[];
 }
@@ -529,34 +530,48 @@ function OffenseContent({ plays, scoutedPlays, currentPlays, sits, currentSits, 
                 <th className="text-left px-4 py-3 text-zinc-400 font-medium">Situation</th>
                 <th className="text-center px-3 py-3 text-zinc-400 font-medium">Plays</th>
                 <th className="text-left px-3 py-3 text-zinc-400 font-medium">Top Formation</th>
+                <th className="text-center px-3 py-3 text-zinc-400 font-medium">Run %</th>
+                {viewMode === 'compare' && <th className="text-center px-3 py-3 text-emerald-400 font-medium text-xs">Live Run %</th>}
                 <th className="text-center px-3 py-3 text-zinc-400 font-medium">Pass %</th>
-                {viewMode === 'compare' && <th className="text-center px-3 py-3 text-emerald-400 font-medium">Current Pass %</th>}
-                <th className="text-center px-3 py-3 text-zinc-400 font-medium">Motion %</th>
+                {viewMode === 'compare' && <th className="text-center px-3 py-3 text-emerald-400 font-medium text-xs">Live Pass %</th>}
               </tr>
             </thead>
             <tbody>
               {sits.map((s, i) => {
                 const curr = currentSits.find(c => c.situation === s.situation);
-                const delta = curr ? curr.passPct - s.passPct : undefined;
-                const holding = delta !== undefined ? Math.abs(delta) <= 15 : undefined;
+                const deltaRun = curr ? curr.runPct - s.runPct : undefined;
+                const deltaPass = curr ? curr.passPct - s.passPct : undefined;
+                const holdingRun = deltaRun !== undefined ? Math.abs(deltaRun) <= 15 : undefined;
+                const holdingPass = deltaPass !== undefined ? Math.abs(deltaPass) <= 15 : undefined;
                 return (
                   <tr key={s.situation} className={`border-t border-zinc-800 ${i % 2 === 0 ? '' : 'bg-zinc-900/50'}`}>
                     <td className="px-4 py-3 font-medium">{s.situation}</td>
                     <td className="text-center px-3 py-3 text-zinc-400">{s.count}</td>
                     <td className="px-3 py-3 text-blue-300">{s.topFormation} <span className="text-zinc-500 text-xs">({s.formationPct}%)</span></td>
                     <td className="text-center px-3 py-3">
+                      <span className={`font-semibold ${s.runPct >= 70 ? 'text-emerald-400' : s.runPct >= 50 ? 'text-amber-400' : 'text-red-400'}`}>{s.runPct}%</span>
+                    </td>
+                    {viewMode === 'compare' && (
+                      <td className="text-center px-3 py-3">
+                        {curr ? (
+                          <span className={`font-semibold ${holdingRun ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {curr.runPct}%{deltaRun !== undefined && <span className="text-xs ml-1">({deltaRun > 0 ? '+' : ''}{deltaRun})</span>}
+                          </span>
+                        ) : <span className="text-zinc-600">—</span>}
+                      </td>
+                    )}
+                    <td className="text-center px-3 py-3">
                       <span className={`font-semibold ${s.passPct >= 70 ? 'text-red-400' : s.passPct >= 50 ? 'text-amber-400' : 'text-emerald-400'}`}>{s.passPct}%</span>
                     </td>
                     {viewMode === 'compare' && (
                       <td className="text-center px-3 py-3">
                         {curr ? (
-                          <span className={`font-semibold ${holding ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {curr.passPct}% {delta !== undefined && <span className="text-xs">({delta > 0 ? '+' : ''}{delta})</span>}
+                          <span className={`font-semibold ${holdingPass ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {curr.passPct}%{deltaPass !== undefined && <span className="text-xs ml-1">({deltaPass > 0 ? '+' : ''}{deltaPass})</span>}
                           </span>
                         ) : <span className="text-zinc-600">—</span>}
                       </td>
                     )}
-                    <td className="text-center px-3 py-3 text-zinc-400">{s.motionPct}%</td>
                   </tr>
                 );
               })}
@@ -640,16 +655,17 @@ function DefenseContent({ plays, scoutedPlays, currentPlays, sits, currentSits, 
                 <th className="text-left px-4 py-3 text-zinc-400 font-medium">Situation</th>
                 <th className="text-center px-3 py-3 text-zinc-400 font-medium">Plays</th>
                 <th className="text-center px-3 py-3 text-zinc-400 font-medium">Blitz %</th>
-                {viewMode === 'compare' && <th className="text-center px-3 py-3 text-emerald-400 font-medium">Current Blitz %</th>}
+                {viewMode === 'compare' && <th className="text-center px-3 py-3 text-emerald-400 font-medium text-xs">Live Blitz %</th>}
                 <th className="text-left px-3 py-3 text-zinc-400 font-medium">Top Coverage</th>
+                {viewMode === 'compare' && <th className="text-left px-3 py-3 text-emerald-400 font-medium text-xs">Live Coverage</th>}
                 <th className="text-left px-3 py-3 text-zinc-400 font-medium">Front</th>
               </tr>
             </thead>
             <tbody>
               {sits.map((s, i) => {
                 const curr = currentSits.find(c => c.situation === s.situation);
-                const delta = curr ? curr.blitzPct - s.blitzPct : undefined;
-                const holding = delta !== undefined ? Math.abs(delta) <= 15 : undefined;
+                const deltaBlitz = curr ? curr.blitzPct - s.blitzPct : undefined;
+                const holdingBlitz = deltaBlitz !== undefined ? Math.abs(deltaBlitz) <= 15 : undefined;
                 return (
                   <tr key={s.situation} className={`border-t border-zinc-800 ${i % 2 === 0 ? '' : 'bg-zinc-900/50'}`}>
                     <td className="px-4 py-3 font-medium">{s.situation}</td>
@@ -660,13 +676,22 @@ function DefenseContent({ plays, scoutedPlays, currentPlays, sits, currentSits, 
                     {viewMode === 'compare' && (
                       <td className="text-center px-3 py-3">
                         {curr ? (
-                          <span className={`font-semibold ${holding ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {curr.blitzPct}% {delta !== undefined && <span className="text-xs">({delta > 0 ? '+' : ''}{delta})</span>}
+                          <span className={`font-semibold ${holdingBlitz ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {curr.blitzPct}%{deltaBlitz !== undefined && <span className="text-xs ml-1">({deltaBlitz > 0 ? '+' : ''}{deltaBlitz})</span>}
                           </span>
                         ) : <span className="text-zinc-600">—</span>}
                       </td>
                     )}
                     <td className="px-3 py-3 text-blue-300">{s.topCoverage} <span className="text-zinc-500 text-xs">({s.coveragePct}%)</span></td>
+                    {viewMode === 'compare' && (
+                      <td className="px-3 py-3">
+                        {curr ? (
+                          <span className={curr.topCoverage === s.topCoverage ? 'text-emerald-400' : 'text-amber-400'}>
+                            {curr.topCoverage} <span className="text-zinc-500 text-xs">({curr.coveragePct}%)</span>
+                          </span>
+                        ) : <span className="text-zinc-600">—</span>}
+                      </td>
+                    )}
                     <td className="px-3 py-3 text-zinc-300">{s.topFront}</td>
                   </tr>
                 );
