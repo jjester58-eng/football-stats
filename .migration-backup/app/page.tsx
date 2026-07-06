@@ -132,7 +132,7 @@ export default function KangaroosLanding() {
       </div>
 
       <footer className="border-t border-zinc-800 py-8 text-center text-zinc-500 text-sm">
-        Kangaroos Football • Built with ❤️ for the sideline
+        Kangaroos Football • Built for the sideline
       </footer>
     </div>
   );
